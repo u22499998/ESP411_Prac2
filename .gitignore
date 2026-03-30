@@ -39,3 +39,55 @@
 
 # debug information files
 *.dwo
+
+# --- STM32CubeIDE & Eclipse Specifics ---
+
+# Build folders (CRITICAL to ignore)
+Debug/
+Release/
+build/
+
+# Firmware binaries and memory maps
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.hex
+
+# STM32CubeMX backups
+*.bak
+
+# IDE/Eclipse local configurations
+*.launch
+.metadata/
+
+# OS generated files (always a good idea)
+.DS_Store
+Thumbs.db
+
+# --- STM32CubeIDE & Eclipse Specifics ---
+
+# Build folders (CRITICAL to ignore)
+Debug/
+Release/
+build/
+
+# Firmware binaries and memory maps
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+*.hex
+
+# STM32CubeMX backups
+*.bak
+
+# IDE/Eclipse local configurations
+*.launch
+.metadata/
+
+# OS generated files (always a good idea)
+.DS_Store
+Thumbs.db
