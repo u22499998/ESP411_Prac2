@@ -23,6 +23,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stm32f429i_discovery_lcd.h"
+#include "stm32f429i_discovery_ts.h"
+#include "ui_types.h"
+#include "main_menu.h"
+#include "sub_menu.h"
+//#include "diagnostics.h"
 
 /* USER CODE END Includes */
 
@@ -60,6 +66,8 @@ SDRAM_HandleTypeDef hsdram1;
 
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
+DisplayState_t currentState = STATE_MAIN_MENU;
+
 
 /* USER CODE END PV */
 
@@ -82,6 +90,21 @@ void StartDefaultTask(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void TouchScreen_Init(void) {
+    // Call the BSP Library function to init a 240x320 screen
+    uint8_t status = BSP_TS_Init(240, 320);
+
+    // Check if the library successfully found the touch chip
+    if (status != TS_OK) {
+        // ERROR: The touch screen failed to initialize
+        BSP_LED_On(LED4);
+
+        while(1) {
+            BSP_LED_Toggle(LED4);
+            HAL_Delay(200);
+        }
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -123,6 +146,17 @@ int main(void)
   MX_TIM1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  	BSP_LCD_Init();
+    BSP_LCD_LayerDefaultInit(1, LCD_FRAME_BUFFER);
+    BSP_LCD_SelectLayer(1);
+    // Clear the RAM buffer to black so we don't display random garbage memory
+    BSP_LCD_Clear(COLOR_BG);
+    BSP_LCD_DisplayOn();
+
+    TouchScreen_Init();
+
+    MainMenu_Draw();
 
   /* USER CODE END 2 */
 
@@ -641,6 +675,22 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// Helper function to read the touch screen and pass back X and Y coordinates
+bool TouchDetected(uint16_t* x_coord, uint16_t* y_coord) {
+    TS_StateTypeDef TS_State;
+
+    // Ask the BSP library for the current touch state
+    BSP_TS_GetState(&TS_State);
+
+    if (TS_State.TouchDetected) {
+        // If touched, grab the coordinates of the first finger (index 0)
+        *x_coord = TS_State.X;
+        *y_coord = 300 - TS_State.Y; //Y given is actually inverted for some reason
+        return true;
+    }
+
+    return false; // No touch detected
+}
 
 /* USER CODE END 4 */
 
@@ -656,11 +706,44 @@ void StartDefaultTask(void const * argument)
   /* init code for USB_HOST */
   MX_USB_HOST_Init();
   /* USER CODE BEGIN 5 */
+  uint16_t x = 0;
+  uint16_t y = 0;
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
-  }
+	  // --- 1. HANDLE TOUCH INPUT ---
+	          if (TouchDetected(&x, &y)) {
+	              DisplayState_t newState = currentState;
+
+	              if (currentState == STATE_MAIN_MENU) {
+	                  newState = MainMenu_HandleTouch(x, y, currentState);
+	                  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
+	                  else if (newState == STATE_SUB_BUFFER) SubMenu_Draw("OUTPUT BUFFER");
+	              }
+	              else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER) {
+	                  newState = SubMenu_HandleTouch(x, y, currentState);
+	                  if (newState == STATE_MAIN_MENU) MainMenu_Draw();
+	                  else if (newState >= STATE_PLOT_HM_TIME) {
+	                      // Transitioning into a graph! Draw the axes ONCE.
+//	                      Diagnostics_InitLandscapeGraph("Live Data");
+	                	  continue;
+	                  }
+	              }
+	              else if (currentState >= STATE_PLOT_HM_TIME) {
+//	                  // Touched while in a graph -> Escape back to Sub Menu
+//	                  newState = (currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ) ? STATE_SUB_HM : STATE_SUB_BUFFER;
+//	                  SubMenu_Draw(newState == STATE_SUB_HM ? "CALCULATE h[m]" : "OUTPUT BUFFER");
+	            	  continue;
+	              }
+
+	              currentState = newState;
+	              HAL_Delay(150); // Debounce
+	          }
+
+	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
+
+
+	      }
   /* USER CODE END 5 */
 }
 
