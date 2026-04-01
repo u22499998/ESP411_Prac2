@@ -29,6 +29,7 @@
 #include "main_menu.h"
 #include "sub_menu.h"
 #include "fir.h"
+#include <stdio.h>
 #include <math.h>
 //#include "diagnostics.h"
 
@@ -39,7 +40,6 @@
 DisplayState_t currentState = STATE_MAIN_MENU;
 uint32_t dma_packed_buffer[513];
 volatile uint8_t dma_data_ready = 0;
-uint16_t test_sine_wave[48];
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -153,7 +153,9 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  BSP_LCD_Init();
+  TouchScreen_Init();
+  FIR_Init();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -174,41 +176,29 @@ int main(void)
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
 
-  	BSP_LCD_Init();
     BSP_LCD_LayerDefaultInit(1, LCD_FRAME_BUFFER);
     BSP_LCD_SelectLayer(1);
     // Clear the RAM buffer to black so we don't display random garbage memory
     BSP_LCD_Clear(COLOR_BG);
     BSP_LCD_DisplayOn();
 
-    TouchScreen_Init();
-
     MainMenu_Draw();
 
-    FIR_Init();
 
     HAL_TIM_Base_Start(&htim7);
-
-    // 1. Generate the 48 fake test values
-      for(int i = 0; i < 48; i++) {
-          // sin() takes radians. 2 * PI is one full wave.
-          // We divide it into 48 steps.
-          float radians = (2.0f * M_PI * (float)i) / 48.0f;
-
-          // Multiply by peak amplitude (2047.5) and add DC offset (2047.5)
-          float voltage_val = (sinf(radians) * 2047.5f) + 2047.5f;
-
-          test_sine_wave[i] = (uint16_t)voltage_val;
-      }
 
     //Wake up ADC
 	HAL_ADC_Start(&hadc3);
 	HAL_ADC_Start(&hadc2);
 
-
-	 HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_2, (uint32_t*)test_sine_wave, 48, DAC_ALIGN_12B_R);
-	// 3. Start the Master ADC and the DMA engine
+	// Start the Master ADC and the DMA engine
 	HAL_ADCEx_MultiModeStart_DMA(&hadc1, dma_packed_buffer, 513);
+
+	 // Trigger the DMA to push the buffer to the DAC at exactly 48kHz
+	  // DMA in Circular or Normal mode
+	  HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_2, (uint32_t*)dac_buffer, 1024, DAC_ALIGN_12B_R);
+
+
 
   /* USER CODE END 2 */
 
@@ -323,13 +313,13 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV6;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -385,7 +375,7 @@ static void MX_ADC2_Init(void)
   hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV6;
   hadc2.Init.Resolution = ADC_RESOLUTION_12B;
   hadc2.Init.ScanConvMode = DISABLE;
-  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.ContinuousConvMode = ENABLE;
   hadc2.Init.DiscontinuousConvMode = DISABLE;
   hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc2.Init.NbrOfConversion = 1;
@@ -435,7 +425,7 @@ static void MX_ADC3_Init(void)
   hadc3.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV6;
   hadc3.Init.Resolution = ADC_RESOLUTION_12B;
   hadc3.Init.ScanConvMode = DISABLE;
-  hadc3.Init.ContinuousConvMode = DISABLE;
+  hadc3.Init.ContinuousConvMode = ENABLE;
   hadc3.Init.DiscontinuousConvMode = DISABLE;
   hadc3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc3.Init.NbrOfConversion = 1;
@@ -778,7 +768,7 @@ static void MX_TIM7_Init(void)
   htim7.Instance = TIM7;
   htim7.Init.Prescaler = 0;
   htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim7.Init.Period = 1499;
+  htim7.Init.Period = 407;
   htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
   {
@@ -1028,6 +1018,7 @@ void StartDefaultTask(void const * argument)
   /* USER CODE BEGIN 5 */
   uint16_t x = 0;
   uint16_t y = 0;
+  char lcd_buffer[50];
 
   /* Infinite loop */
   for(;;)
@@ -1062,17 +1053,17 @@ void StartDefaultTask(void const * argument)
 	          }
 
 	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
-//	          if (dma_data_ready)
-//	          	          {
-//	          			    dma_data_ready = 0;
-//
-//	          	        	// 1. Unpack ADC DMA data into floats (removes 2048 DC offset)
-//	          				int n = 0;
-//	          				for (int i = 0; i < 512; i += 1) {
-//	          					signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF) - 2048.0f;
-//	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16)   - 2048.0f;
-//	          				}
-//
+	          if (dma_data_ready)
+	          	          {
+	          			    dma_data_ready = 0;
+
+	          	        	// 1. Unpack ADC DMA data into floats
+	          				int n = 0;
+	          				for (int i = 0; i < 512; i += 1) {
+	          					signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
+	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
+	          				}
+
 //	                          // 2. Run the digital FIR filter using your new module
 //	                          // This function takes the input array, processes it, and fills the output array
 //	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
@@ -1080,7 +1071,7 @@ void StartDefaultTask(void const * argument)
 //	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
 //	                          for (int i = 0; i < 1024; i++) {
 //	                              // Add the 2048 DC offset back so the wave is centered properly
-//	                              float dac_val = output_samples[i] + 2048.0f;
+//	                              float dac_val = output_samples[i];
 //
 //	                              // Clamp values to prevent integer overflow/underflow screeching
 //	                              if (dac_val > 4095.0f) dac_val = 4095.0f;
@@ -1089,12 +1080,20 @@ void StartDefaultTask(void const * argument)
 //	                              dac_buffer[i] = (uint16_t)dac_val;
 //	                          }
 //
-//	                          // 4. Trigger the DMA to push the buffer to the DAC at exactly 48kHz
-//	                          // Assuming you configured DAC CH1 with DMA in Circular or Normal mode
-//	                          HAL_DAC_Start_DMA(&hdac, DAC_CHANNEL_2, (uint32_t*)dac_buffer, 1024, DAC_ALIGN_12B_R);
-//	          	          }
+	          				// Just copy the raw input straight to the DAC buffer
+	          				for (int i = 0; i < 1024; i++) {
+	          				    // Add the DC offset back
+	          				    float dac_val = signal_samples[i];
+
+	          				    // Clamp
+	          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
+	          				    if (dac_val < 0.0f)    dac_val = 0.0f;
+
+	          				    dac_buffer[i] = (uint16_t)dac_val;
+	          				}
 
 
+	          	          }
 
 	      }
   /* USER CODE END 5 */

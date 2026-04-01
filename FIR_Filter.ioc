@@ -1,8 +1,10 @@
 #MicroXplorer Configuration settings - do not modify
 ADC1.Channel-0\#ChannelRegularConversion=ADC_CHANNEL_13
 ADC1.ClockPrescaler=ADC_CLOCK_SYNC_PCLK_DIV6
+ADC1.ContinuousConvMode=ENABLE
 ADC1.DMAAccessMode=ADC_DMAACCESSMODE_2
-ADC1.IPParameters=Rank-0\#ChannelRegularConversion,master,Channel-0\#ChannelRegularConversion,SamplingTime-0\#ChannelRegularConversion,NbrOfConversionFlag,Mode,DMAAccessMode,TwoSamplingDelay,ClockPrescaler
+ADC1.DMAContinuousRequests=ENABLE
+ADC1.IPParameters=Rank-0\#ChannelRegularConversion,master,Channel-0\#ChannelRegularConversion,SamplingTime-0\#ChannelRegularConversion,NbrOfConversionFlag,Mode,DMAAccessMode,TwoSamplingDelay,ClockPrescaler,ContinuousConvMode,DMAContinuousRequests
 ADC1.Mode=ADC_TRIPLEMODE_INTERL
 ADC1.NbrOfConversionFlag=1
 ADC1.Rank-0\#ChannelRegularConversion=1
@@ -1084,7 +1086,7 @@ SPI5.IPParameters=Mode,CalculateBaudRate,VirtualType,Direction,BaudRatePrescaler
 SPI5.Mode=SPI_MODE_MASTER
 SPI5.VirtualType=VM_MASTER
 TIM7.IPParameters=Period,TIM_MasterOutputTrigger
-TIM7.Period=1499
+TIM7.Period=407
 TIM7.TIM_MasterOutputTrigger=TIM_TRGO_UPDATE
 USART1.IPParameters=VirtualMode
 USART1.VirtualMode=VM_ASYNC
