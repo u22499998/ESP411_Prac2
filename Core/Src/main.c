@@ -1018,7 +1018,6 @@ void StartDefaultTask(void const * argument)
   /* USER CODE BEGIN 5 */
   uint16_t x = 0;
   uint16_t y = 0;
-  char lcd_buffer[50];
 
   /* Infinite loop */
   for(;;)
