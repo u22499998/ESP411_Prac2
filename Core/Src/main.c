@@ -31,7 +31,9 @@
 #include "fir.h"
 #include <stdio.h>
 #include <math.h>
-//#include "diagnostics.h"
+#include "arm_math.h"
+#include "arm_const_structs.h"
+#include "diagnostics.h"
 
 /* USER CODE END Includes */
 
@@ -40,6 +42,7 @@
 DisplayState_t currentState = STATE_MAIN_MENU;
 uint32_t dma_packed_buffer[513];
 volatile uint8_t dma_data_ready = 0;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -83,6 +86,9 @@ osThreadId defaultTaskHandle;
 float signal_samples[1024]; // Unpacked floating-point input
 float output_samples[1024]; // Filtered floating-point output
 uint16_t dac_buffer[1024];  // Formatted 12-bit integer output for the DAC
+arm_rfft_fast_instance_f32 fft_handler;
+float fft_output_array[1024];
+float fft_magnitudes[512];
 
 /* USER CODE END PV */
 
@@ -1018,6 +1024,8 @@ void StartDefaultTask(void const * argument)
   /* USER CODE BEGIN 5 */
   uint16_t x = 0;
   uint16_t y = 0;
+  arm_rfft_fast_init_f32(&fft_handler, 1024);
+  bool fft_graph_initialized = false;
 
   /* Infinite loop */
   for(;;)
@@ -1028,6 +1036,13 @@ void StartDefaultTask(void const * argument)
 
 	              if (currentState == STATE_MAIN_MENU) {
 	                  newState = MainMenu_HandleTouch(x, y, currentState);
+
+	                  if (newState == STATE_PLOT_RAW_FFT) {
+	                          currentState = newState;
+	                          // Reset the flag so the initialization function runs!
+	                          fft_graph_initialized = false;
+	                      }
+
 	                  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
 	                  else if (newState == STATE_SUB_BUFFER) SubMenu_Draw("OUTPUT BUFFER");
 	              }
@@ -1036,7 +1051,6 @@ void StartDefaultTask(void const * argument)
 	                  if (newState == STATE_MAIN_MENU) MainMenu_Draw();
 	                  else if (newState >= STATE_PLOT_HM_TIME) {
 	                      // Transitioning into a graph! Draw the axes ONCE.
-//	                      Diagnostics_InitLandscapeGraph("Live Data");
 	                	  continue;
 	                  }
 	              }
@@ -1046,6 +1060,18 @@ void StartDefaultTask(void const * argument)
 //	                  SubMenu_Draw(newState == STATE_SUB_HM ? "CALCULATE h[m]" : "OUTPUT BUFFER");
 	            	  continue;
 	              }
+	              else if (currentState == STATE_PLOT_RAW_FFT) {
+	                      // 1. Change the state back to the main menu
+	                      newState = STATE_MAIN_MENU;
+
+	                      // 2. Immediately redraw the main menu so the graph disappears
+	                      MainMenu_Draw();
+
+	                      // 3. CRITICAL: The "Debounce" Delay
+	                      // If you don't add this, your finger might still be touching the screen
+	                      // when the main menu draws, accidentally pressing a button immediately!
+	                      osDelay(300);
+	                  }
 
 	              currentState = newState;
 	              HAL_Delay(150); // Debounce
@@ -1078,7 +1104,25 @@ void StartDefaultTask(void const * argument)
 //
 //	                              dac_buffer[i] = (uint16_t)dac_val;
 //	                          }
-//
+
+	          				// 3. Execute the Plotting State
+								if (currentState == STATE_PLOT_RAW_FFT) {
+									// 1. If we just entered this screen, draw the axes ONCE
+									if (!fft_graph_initialized) {
+										Diagnostics_InitRawFFTGraph(25,25,256, 175, 8, 5);
+										fft_graph_initialized = true;
+									}
+
+									// 2. Do the heavy math
+									arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
+									arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+
+									// 3. Fast-draw the dynamic data!
+									Diagnostics_UpdateRawFFT(fft_magnitudes);
+
+
+								}
+
 	          				// Just copy the raw input straight to the DAC buffer
 	          				for (int i = 0; i < 1024; i++) {
 	          				    // Add the DC offset back
