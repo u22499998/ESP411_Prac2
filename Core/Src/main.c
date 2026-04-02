@@ -1061,15 +1061,8 @@ void StartDefaultTask(void const * argument)
 	            	  continue;
 	              }
 	              else if (currentState == STATE_PLOT_RAW_FFT) {
-	                      // 1. Change the state back to the main menu
 	                      newState = STATE_MAIN_MENU;
-
-	                      // 2. Immediately redraw the main menu so the graph disappears
 	                      MainMenu_Draw();
-
-	                      // 3. CRITICAL: The "Debounce" Delay
-	                      // If you don't add this, your finger might still be touching the screen
-	                      // when the main menu draws, accidentally pressing a button immediately!
 	                      osDelay(300);
 	                  }
 
