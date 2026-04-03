@@ -198,4 +198,73 @@ void Diagnostics_UpdateRawFFT(float* fft_magnitudes) {
     }
 }
 
+// ============================================================================
+// 3. ADDITIONAL PRACTICAL 2 PLOTTERS
+// ============================================================================
+
+/**
+ * @brief Draws the static Filter Coefficients h[m]
+ */
+void Diagnostics_DrawHMPlot(float* coefficients, uint16_t order) {
+    BSP_LCD_Clear(COLOR_BG);
+    BSP_LCD_SetTextColor(LCD_COLOR_CYAN);
+
+    // Draw Basic Axes for h[m]
+    BSP_LCD_DrawHLine(40, 120, 240); // Horizontal Center line (Zero)
+    BSP_LCD_DrawVLine(40, 20, 200);  // Vertical Axis
+
+    BSP_LCD_SetFont(&Font16);
+    UI_DrawRotatedString(100, 230, "Coefficients h[m]");
+    BSP_LCD_SetFont(&Font12);
+    UI_DrawRotatedString(280, 115, "m");
+
+    BSP_LCD_SetTextColor(LCD_COLOR_YELLOW);
+    for (int i = 0; i < order - 1; i++) {
+        // Map coefficients to screen (scaled for visibility)
+        int y1 = 120 - (int)(coefficients[i] * 500.0f);
+        int y2 = 120 - (int)(coefficients[i+1] * 500.0f);
+        int x1 = 40 + (i * 240 / order);
+        int x2 = 40 + ((i + 1) * 240 / order);
+
+        // Use physical coordinates for DrawLine (Phys X = Cart Y, Phys Y = Cart X)
+        BSP_LCD_DrawLine(y1, x1, y2, x2);
+    }
+}
+
+/**
+ * @brief Continuous Time Domain plotter (Input vs Filtered Output)
+ */
+void Diagnostics_UpdateTimeDomain(float* input, float* output) {
+    static uint16_t prev_in[250] = {0};
+    static uint16_t prev_out[250] = {0};
+
+    for (int i = 0; i < 249; i++) {
+        uint16_t x = 40 + i;
+
+        // Map ADC 0-4095 to 0-100 pixels (Top half)
+        uint16_t in_y = 60 - (uint16_t)((input[i] - 2048.0f) / 40.0f);
+        // Map Filtered output to 0-100 pixels (Bottom half)
+        uint16_t out_y = 180 - (uint16_t)(output[i] / 40.0f);
+
+        // Erase old pixels
+        DrawPixelLandscape(x, prev_in[i], COLOR_BG);
+        DrawPixelLandscape(x, prev_out[i], COLOR_BG);
+
+        // Draw new pixels
+        DrawPixelLandscape(x, in_y, LCD_COLOR_BLUE);   // Input (Blue)
+        DrawPixelLandscape(x, out_y, LCD_COLOR_ORANGE); // Output (Orange)
+
+        prev_in[i] = in_y;
+        prev_out[i] = out_y;
+    }
+}
+
+/**
+ * @brief Reuses the FFT Graph logic for the Filtered Frequency Spectrum
+ */
+void Diagnostics_InitFilteredFFTGraph(void) {
+    Diagnostics_InitRawFFTGraph(25, 25, 256, 175, 8, 5);
+    BSP_LCD_SetFont(&Font16);
+    UI_DrawRotatedString(100, 230, "FILTERED SPECTRUM");
+}
 

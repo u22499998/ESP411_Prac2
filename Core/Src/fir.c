@@ -13,7 +13,7 @@
 
 // --- Private State Variables ---
 // Using static keeps these hidden from the rest of the program
-static float fir_coeffs[FIR_ORDER];
+float fir_coeffs[FIR_ORDER];
 static float sample_history[FIR_ORDER];
 
 /**

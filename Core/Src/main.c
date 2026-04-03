@@ -1029,46 +1029,54 @@ void StartDefaultTask(void const * argument)
 
   /* Infinite loop */
   for(;;)
-  {
-	  // --- 1. HANDLE TOUCH INPUT ---
-	          if (TouchDetected(&x, &y)) {
-	              DisplayState_t newState = currentState;
+	  {
+		  // --- 1. HANDLE TOUCH INPUT ---
+		  if (TouchDetected(&x, &y)) {
+			  DisplayState_t newState = currentState;
 
-	              if (currentState == STATE_MAIN_MENU) {
-	                  newState = MainMenu_HandleTouch(x, y, currentState);
+			  if (currentState == STATE_MAIN_MENU) {
+				  newState = MainMenu_HandleTouch(x, y, currentState);
+				  if (newState == STATE_PLOT_RAW_FFT) {
+					  fft_graph_initialized = false;
+				  }
+				  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
+				  else if (newState == STATE_SUB_BUFFER) SubMenu_Draw("OUTPUT BUFFER");
+			  }
+			  else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER) {
+				  newState = SubMenu_HandleTouch(x, y, currentState);
+				  if (newState == STATE_MAIN_MENU) {
+					  MainMenu_Draw();
+				  }
+				  // --- ADD THESE TRIGGERS ---
+				  else if (newState == STATE_PLOT_HM_TIME) {
+					  // This is a one-shot draw because h[m] is static
+					  extern float fir_coeffs[]; // Link to fir.c
+					  Diagnostics_DrawHMPlot(fir_coeffs, FIR_ORDER);
+				  }
+				  else if (newState == STATE_PLOT_BUFFER_TIME || newState == STATE_PLOT_BUFFER_FREQ) {
+					  // For continuous signal plots, just initialize the axes once
+					  Diagnostics_InitFilteredFFTGraph();
+					  fft_graph_initialized = true;
+				  }
+			  }
+			  // --- "TAP ANYWHERE TO EXIT" LOGIC ---
+			  else if (currentState >= STATE_PLOT_RAW_FFT) {
+				  if (currentState == STATE_PLOT_RAW_FFT) {
+					  newState = STATE_MAIN_MENU;
+					  MainMenu_Draw();
+				  } else if (currentState <= STATE_PLOT_HM_FREQ) {
+					  newState = STATE_SUB_HM;
+					  SubMenu_Draw("CALCULATE h[m]");
+				  } else {
+					  newState = STATE_SUB_BUFFER;
+					  SubMenu_Draw("OUTPUT BUFFER");
+				  }
+				  osDelay(300); // Prevent immediate accidental click
+			  }
 
-	                  if (newState == STATE_PLOT_RAW_FFT) {
-	                          currentState = newState;
-	                          // Reset the flag so the initialization function runs!
-	                          fft_graph_initialized = false;
-	                      }
-
-	                  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
-	                  else if (newState == STATE_SUB_BUFFER) SubMenu_Draw("OUTPUT BUFFER");
-	              }
-	              else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER) {
-	                  newState = SubMenu_HandleTouch(x, y, currentState);
-	                  if (newState == STATE_MAIN_MENU) MainMenu_Draw();
-	                  else if (newState >= STATE_PLOT_HM_TIME) {
-	                      // Transitioning into a graph! Draw the axes ONCE.
-	                	  continue;
-	                  }
-	              }
-	              else if (currentState >= STATE_PLOT_HM_TIME) {
-//	                  // Touched while in a graph -> Escape back to Sub Menu
-//	                  newState = (currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ) ? STATE_SUB_HM : STATE_SUB_BUFFER;
-//	                  SubMenu_Draw(newState == STATE_SUB_HM ? "CALCULATE h[m]" : "OUTPUT BUFFER");
-	            	  continue;
-	              }
-	              else if (currentState == STATE_PLOT_RAW_FFT) {
-	                      newState = STATE_MAIN_MENU;
-	                      MainMenu_Draw();
-	                      osDelay(300);
-	                  }
-
-	              currentState = newState;
-	              HAL_Delay(150); // Debounce
-	          }
+			  currentState = newState;
+			  HAL_Delay(150); // Debounce
+		  }
 
 	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
 	          if (dma_data_ready)
@@ -1098,23 +1106,27 @@ void StartDefaultTask(void const * argument)
 //	                              dac_buffer[i] = (uint16_t)dac_val;
 //	                          }
 
-	          				// 3. Execute the Plotting State
-								if (currentState == STATE_PLOT_RAW_FFT) {
-									// 1. If we just entered this screen, draw the axes ONCE
-									if (!fft_graph_initialized) {
-										Diagnostics_InitRawFFTGraph(25,25,256, 175, 8, 5);
-										fft_graph_initialized = true;
-									}
-
-									// 2. Do the heavy math
-									arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
-									arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
-
-									// 3. Fast-draw the dynamic data!
-									Diagnostics_UpdateRawFFT(fft_magnitudes);
-
-
-								}
+	          				// 3. Execute the Continuous Plotting States
+	          				if (currentState == STATE_PLOT_RAW_FFT) {
+	          				    if (!fft_graph_initialized) {
+	          				        Diagnostics_InitRawFFTGraph(25, 25, 256, 175, 8, 5);
+	          				        fft_graph_initialized = true;
+	          				    }
+	          				    arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
+	          				    arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+	          				    Diagnostics_UpdateRawFFT(fft_magnitudes);
+	          				}
+	          				// --- ADD THESE NEW STATES ---
+	          				else if (currentState == STATE_PLOT_BUFFER_TIME) {
+	          				    // Plots input vs output waveforms in real-time
+	          				    Diagnostics_UpdateTimeDomain(signal_samples, output_samples);
+	          				}
+	          				else if (currentState == STATE_PLOT_BUFFER_FREQ) {
+	          				    // Shows the spectrum of the FILTERED signal
+	          				    arm_rfft_fast_f32(&fft_handler, output_samples, fft_output_array, 0);
+	          				    arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+	          				    Diagnostics_UpdateRawFFT(fft_magnitudes);
+	          				}
 
 	          				// Just copy the raw input straight to the DAC buffer
 	          				for (int i = 0; i < 1024; i++) {

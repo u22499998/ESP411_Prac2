@@ -33,4 +33,9 @@ void Diagnostics_InitRawFFTGraph(uint16_t origin_x, uint16_t origin_y,
 // Fast-updates only the changed pixels on the graph
 void Diagnostics_UpdateRawFFT(float* fft_magnitudes);
 
+// plot 2. h[m] functions
+void Diagnostics_DrawHMPlot(float* coefficients, uint16_t order);
+void Diagnostics_UpdateTimeDomain(float* input, float* output);
+void Diagnostics_InitFilteredFFTGraph(void);
+
 #endif // DIAGNOSTICS_H
