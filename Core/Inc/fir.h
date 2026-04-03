@@ -22,5 +22,6 @@
 // --- Public Function Prototypes ---
 void FIR_Init(void);
 void FIR_ProcessBlock(float* input_block, float* output_block, uint32_t block_size);
+extern float fir_coeffs[FIR_ORDER];
 
 #endif /* INC_FIR_H_ */

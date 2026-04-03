@@ -209,24 +209,24 @@ void Diagnostics_DrawHMPlot(float* coefficients, uint16_t order) {
     BSP_LCD_Clear(COLOR_BG);
     BSP_LCD_SetTextColor(LCD_COLOR_CYAN);
 
-    // Draw Basic Axes for h[m]
-    BSP_LCD_DrawHLine(40, 120, 240); // Horizontal Center line (Zero)
-    BSP_LCD_DrawVLine(40, 20, 200);  // Vertical Axis
+    // Draw X-axis at the vertical center of the plot area
+    BSP_LCD_DrawHLine(40, 120, 240);
+    BSP_LCD_DrawVLine(40, 20, 200);
 
     BSP_LCD_SetFont(&Font16);
-    UI_DrawRotatedString(100, 230, "Coefficients h[m]");
-    BSP_LCD_SetFont(&Font12);
-    UI_DrawRotatedString(280, 115, "m");
+    UI_DrawRotatedString(80, 230, "Impulse Response h[m]");
 
     BSP_LCD_SetTextColor(LCD_COLOR_YELLOW);
     for (int i = 0; i < order - 1; i++) {
-        // Map coefficients to screen (scaled for visibility)
-        int y1 = 120 - (int)(coefficients[i] * 500.0f);
-        int y2 = 120 - (int)(coefficients[i+1] * 500.0f);
+        // Find center and scale. Increase 800.0f if the line is too flat.
+        int y1 = 120 - (int)(coefficients[i] * 800.0f);
+        int y2 = 120 - (int)(coefficients[i+1] * 800.0f);
+
+        // Map index to the 240-pixel wide plot area
         int x1 = 40 + (i * 240 / order);
         int x2 = 40 + ((i + 1) * 240 / order);
 
-        // Use physical coordinates for DrawLine (Phys X = Cart Y, Phys Y = Cart X)
+        // Physical coordinates: Phys X = Cart Y, Phys Y = Cart X
         BSP_LCD_DrawLine(y1, x1, y2, x2);
     }
 }

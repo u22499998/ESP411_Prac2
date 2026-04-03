@@ -1026,124 +1026,141 @@ void StartDefaultTask(void const * argument)
   uint16_t y = 0;
   arm_rfft_fast_init_f32(&fft_handler, 1024);
   bool fft_graph_initialized = false;
+  extern float fir_coeffs[FIR_ORDER];
 
   /* Infinite loop */
-  for(;;)
-	  {
-		  // --- 1. HANDLE TOUCH INPUT ---
-		  if (TouchDetected(&x, &y)) {
-			  DisplayState_t newState = currentState;
+    for(;;)
+  	  {
+  		  // --- 1. HANDLE TOUCH INPUT ---
+  		  if (TouchDetected(&x, &y)) {
+  			  DisplayState_t newState = currentState;
 
-			  if (currentState == STATE_MAIN_MENU) {
-				  newState = MainMenu_HandleTouch(x, y, currentState);
-				  if (newState == STATE_PLOT_RAW_FFT) {
-					  fft_graph_initialized = false;
-				  }
-				  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
-				  else if (newState == STATE_SUB_BUFFER) SubMenu_Draw("OUTPUT BUFFER");
-			  }
-			  else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER) {
-				  newState = SubMenu_HandleTouch(x, y, currentState);
-				  if (newState == STATE_MAIN_MENU) {
-					  MainMenu_Draw();
-				  }
-				  // --- ADD THESE TRIGGERS ---
-				  else if (newState == STATE_PLOT_HM_TIME) {
-					  // This is a one-shot draw because h[m] is static
-					  extern float fir_coeffs[]; // Link to fir.c
-					  Diagnostics_DrawHMPlot(fir_coeffs, FIR_ORDER);
-				  }
-				  else if (newState == STATE_PLOT_BUFFER_TIME || newState == STATE_PLOT_BUFFER_FREQ) {
-					  // For continuous signal plots, just initialize the axes once
-					  Diagnostics_InitFilteredFFTGraph();
-					  fft_graph_initialized = true;
-				  }
-			  }
-			  // --- "TAP ANYWHERE TO EXIT" LOGIC ---
-			  else if (currentState >= STATE_PLOT_RAW_FFT) {
-				  if (currentState == STATE_PLOT_RAW_FFT) {
-					  newState = STATE_MAIN_MENU;
-					  MainMenu_Draw();
-				  } else if (currentState <= STATE_PLOT_HM_FREQ) {
-					  newState = STATE_SUB_HM;
-					  SubMenu_Draw("CALCULATE h[m]");
-				  } else {
-					  newState = STATE_SUB_BUFFER;
-					  SubMenu_Draw("OUTPUT BUFFER");
-				  }
-				  osDelay(300); // Prevent immediate accidental click
-			  }
+  			  if (currentState == STATE_MAIN_MENU) {
+  				  newState = MainMenu_HandleTouch(x, y, currentState);
+  				  if (newState == STATE_PLOT_RAW_FFT) {
+  					  fft_graph_initialized = false;
+  				  }
+  				  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
+  				  else if (newState == STATE_SUB_BUFFER) SubMenu_Draw("OUTPUT BUFFER");
+  			  }
+  			  else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER) {
+  				  newState = SubMenu_HandleTouch(x, y, currentState);
+  				  if (newState == STATE_MAIN_MENU) {
+  					  MainMenu_Draw();
+  				  }
+  				  // --- TRIGGERS ---
+  				  else if (newState == STATE_PLOT_HM_TIME) {
+  					  // This is a one-shot draw because h[m] is static
+  					  extern float fir_coeffs[];
+  					  Diagnostics_DrawHMPlot(fir_coeffs, FIR_ORDER);
+  				  }
+  				  else if (newState == STATE_PLOT_HM_FREQ) {
+  					  // New One-Shot Logic: Calculate the Frequency Response of the filter
+  					  Diagnostics_InitFilteredFFTGraph();
 
-			  currentState = newState;
-			  HAL_Delay(150); // Debounce
-		  }
+  					  // Zero-pad a temporary buffer with coefficients
+  					  for(int i=0; i<1024; i++) fft_output_array[i] = (i < FIR_ORDER) ? fir_coeffs[i] : 0.0f;
 
-	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
-	          if (dma_data_ready)
-	          	          {
-	          			    dma_data_ready = 0;
+  					  arm_rfft_fast_f32(&fft_handler, fft_output_array, signal_samples, 0); // Reuse signal_samples as temp
+  					  arm_cmplx_mag_f32(signal_samples, fft_magnitudes, 512);
+  					  Diagnostics_UpdateRawFFT(fft_magnitudes);
+  				  }
+  				  else if (newState == STATE_PLOT_BUFFER_TIME || newState == STATE_PLOT_BUFFER_FREQ) {
+  					  // For continuous signal plots, just initialize the axes once
+  					  Diagnostics_InitFilteredFFTGraph();
+  					  fft_graph_initialized = true;
+  				  }
 
-	          	        	// 1. Unpack ADC DMA data into floats
-	          				int n = 0;
-	          				for (int i = 0; i < 512; i += 1) {
-	          					signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
-	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
-	          				}
+  				  // FIX: Prevent immediate exit by waiting for touch release and debouncing
+  				  if (newState != currentState) {
+  					  currentState = newState;
+  					  HAL_Delay(400);
+  					  continue; // Skip exit check for this frame
+  				  }
+  			  }
+  			  // --- "TAP ANYWHERE TO EXIT" LOGIC ---
+  			  else if (currentState >= STATE_PLOT_RAW_FFT) {
+  				  if (currentState == STATE_PLOT_RAW_FFT) {
+  					  newState = STATE_MAIN_MENU;
+  					  MainMenu_Draw();
+  				  } else if (currentState <= STATE_PLOT_HM_FREQ) {
+  					  newState = STATE_SUB_HM;
+  					  SubMenu_Draw("CALCULATE h[m]");
+  				  } else {
+  					  newState = STATE_SUB_BUFFER;
+  					  SubMenu_Draw("OUTPUT BUFFER");
+  				  }
+  				  currentState = newState; // Ensure state updates before delay
+  				  osDelay(300); // Prevent immediate accidental click
+  			  }
 
-//	                          // 2. Run the digital FIR filter using your new module
-//	                          // This function takes the input array, processes it, and fills the output array
-//	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
-//
-//	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
-//	                          for (int i = 0; i < 1024; i++) {
-//	                              // Add the 2048 DC offset back so the wave is centered properly
-//	                              float dac_val = output_samples[i];
-//
-//	                              // Clamp values to prevent integer overflow/underflow screeching
-//	                              if (dac_val > 4095.0f) dac_val = 4095.0f;
-//	                              if (dac_val < 0.0f)    dac_val = 0.0f;
-//
-//	                              dac_buffer[i] = (uint16_t)dac_val;
-//	                          }
+  			  currentState = newState;
+  			  HAL_Delay(150); // Debounce
+  		  }
 
-	          				// 3. Execute the Continuous Plotting States
-	          				if (currentState == STATE_PLOT_RAW_FFT) {
-	          				    if (!fft_graph_initialized) {
-	          				        Diagnostics_InitRawFFTGraph(25, 25, 256, 175, 8, 5);
-	          				        fft_graph_initialized = true;
-	          				    }
-	          				    arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
-	          				    arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
-	          				    Diagnostics_UpdateRawFFT(fft_magnitudes);
-	          				}
-	          				// --- ADD THESE NEW STATES ---
-	          				else if (currentState == STATE_PLOT_BUFFER_TIME) {
-	          				    // Plots input vs output waveforms in real-time
-	          				    Diagnostics_UpdateTimeDomain(signal_samples, output_samples);
-	          				}
-	          				else if (currentState == STATE_PLOT_BUFFER_FREQ) {
-	          				    // Shows the spectrum of the FILTERED signal
-	          				    arm_rfft_fast_f32(&fft_handler, output_samples, fft_output_array, 0);
-	          				    arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
-	          				    Diagnostics_UpdateRawFFT(fft_magnitudes);
-	          				}
+  	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
+  	          if (dma_data_ready)
+  	          	          {
+  	          			    dma_data_ready = 0;
 
-	          				// Just copy the raw input straight to the DAC buffer
-	          				for (int i = 0; i < 1024; i++) {
-	          				    // Add the DC offset back
-	          				    float dac_val = signal_samples[i];
+  	          	        	// 1. Unpack ADC DMA data into floats
+  	          				int n = 0;
+  	          				for (int i = 0; i < 512; i += 1) {
+  	          					signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
+  	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
+  	          				}
 
-	          				    // Clamp
-	          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
-	          				    if (dac_val < 0.0f)    dac_val = 0.0f;
+  //	                          // 2. Run the digital FIR filter using your new module
+  //	                          // This function takes the input array, processes it, and fills the output array
+  //	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
+  //
+  //	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
+  //	                          for (int i = 0; i < 1024; i++) {
+  //	                              // Add the 2048 DC offset back so the wave is centered properly
+  //	                              float dac_val = output_samples[i];
+  //
+  //	                              // Clamp values to prevent integer overflow/underflow screeching
+  //	                              if (dac_val > 4095.0f) dac_val = 4095.0f;
+  //	                              if (dac_val < 0.0f)    dac_val = 0.0f;
+  //
+  //	                              dac_buffer[i] = (uint16_t)dac_val;
+  //	                          }
 
-	          				    dac_buffer[i] = (uint16_t)dac_val;
-	          				}
+  	          				// 3. Execute the Continuous Plotting States
+  	          				if (currentState == STATE_PLOT_RAW_FFT) {
+  	          				    if (!fft_graph_initialized) {
+  	          				        Diagnostics_InitRawFFTGraph(25, 25, 256, 175, 8, 5);
+  	          				        fft_graph_initialized = true;
+  	          				    }
+  	          				    arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
+  	          				    arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+  	          				    Diagnostics_UpdateRawFFT(fft_magnitudes);
+  	          				}
+  	          				// --- ADD THESE NEW STATES ---
+  	          				else if (currentState == STATE_PLOT_BUFFER_TIME) {
+  	          				    // Plots input vs output waveforms in real-time
+  	          				    Diagnostics_UpdateTimeDomain(signal_samples, output_samples);
+  	          				}
+  	          				else if (currentState == STATE_PLOT_BUFFER_FREQ) {
+  	          				    // Shows the spectrum of the FILTERED signal
+  	          				    arm_rfft_fast_f32(&fft_handler, output_samples, fft_output_array, 0);
+  	          				    arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+  	          				    Diagnostics_UpdateRawFFT(fft_magnitudes);
+  	          				}
 
+  	          				// Just copy the raw input straight to the DAC buffer
+  	          				for (int i = 0; i < 1024; i++) {
+  	          				    // Add the DC offset back
+  	          				    float dac_val = signal_samples[i];
 
-	          	          }
+  	          				    // Clamp
+  	          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
+  	          				    if (dac_val < 0.0f)    dac_val = 0.0f;
 
-	      }
+  	          				    dac_buffer[i] = (uint16_t)dac_val;
+  	          				}
+  	          	          }
+  	      }
   /* USER CODE END 5 */
 }
 
