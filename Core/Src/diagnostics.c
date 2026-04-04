@@ -11,6 +11,7 @@
 #include "fonts.h"    // Required for the sFONT structure and font tables
 #include <math.h>
 
+static uint16_t previous_heights[256] = {0};
 // ============================================================================
 // 1. LOW LEVEL LANDSCAPE ENGINE
 // ============================================================================
@@ -141,8 +142,14 @@ void Diagnostics_InitRawFFTGraph(uint16_t origin_x, uint16_t origin_y,
 	    UI_DrawRotatedString(100, 230, "RAW ADC FFT");
 }
 
+void Diagnostics_ResetFFTMemory(void) {
+    for (int i = 0; i < 256; i++) {
+        previous_heights[i] = 0;
+    }
+}
+
 void Diagnostics_UpdateRawFFT(float* fft_magnitudes) {
-    static uint16_t previous_heights[256] = {0};
+
 
     for (int i = 1; i < 256; i++) {
         uint16_t x = 25 + i; // Exactly 1 bin per pixel
@@ -207,28 +214,42 @@ void Diagnostics_UpdateRawFFT(float* fft_magnitudes) {
  */
 void Diagnostics_DrawHMPlot(float* coefficients, uint16_t order) {
     BSP_LCD_Clear(COLOR_BG);
+
+    // 1. Draw Axis Lines
     BSP_LCD_SetTextColor(LCD_COLOR_CYAN);
+    BSP_LCD_DrawLine(120, 40, 120, 280); // X-axis (Center)
+    BSP_LCD_DrawLine(20, 40, 220, 40);   // Y-axis (Left)
 
-    // Draw X-axis at the vertical center of the plot area
-    BSP_LCD_DrawHLine(40, 120, 240);
-    BSP_LCD_DrawVLine(40, 20, 200);
-
+    // 2. Add Axis Headings (Titles)
     BSP_LCD_SetFont(&Font16);
+    BSP_LCD_SetTextColor(COLOR_TEXT);
+    // Main Title
     UI_DrawRotatedString(80, 230, "Impulse Response h[m]");
 
+    // 3. Add Axis Labels
+    BSP_LCD_SetFont(&Font12);
+    // Y-Axis Label (Amplitude) - Near the vertical axis
+    UI_DrawRotatedString(10, 140, "Amp");
+
+    // X-Axis Label (Sample Index) - At the far end of the horizontal axis
+    UI_DrawRotatedString(260, 110, "m");
+
+    // 4. Draw the actual sinc data...
     BSP_LCD_SetTextColor(LCD_COLOR_YELLOW);
     for (int i = 0; i < order - 1; i++) {
-        // Find center and scale. Increase 800.0f if the line is too flat.
-        int y1 = 120 - (int)(coefficients[i] * 800.0f);
-        int y2 = 120 - (int)(coefficients[i+1] * 800.0f);
+            // Find center (120) and scale (800.0f).
+            // Increase 800.0f if the line is too flat.
+    	int y1 = 120 + (int)(coefficients[i] * 800.0f);
+    	int y2 = 120 + (int)(coefficients[i+1] * 800.0f);
 
-        // Map index to the 240-pixel wide plot area
-        int x1 = 40 + (i * 240 / order);
-        int x2 = 40 + ((i + 1) * 240 / order);
+            // Map index to the 240-pixel wide plot area (from x=40 to x=280)
+            int x1 = 40 + (i * 240 / order);
+            int x2 = 40 + ((i + 1) * 240 / order);
 
-        // Physical coordinates: Phys X = Cart Y, Phys Y = Cart X
-        BSP_LCD_DrawLine(y1, x1, y2, x2);
-    }
+            // Map Cartesian to Physical coordinates:
+            // Physical X = Cartesian Y, Physical Y = Cartesian X
+            BSP_LCD_DrawLine(y1, x1, y2, x2);
+        }
 }
 
 /**

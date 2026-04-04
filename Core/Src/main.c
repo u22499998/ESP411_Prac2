@@ -1054,17 +1054,29 @@ void StartDefaultTask(void const * argument)
   					  extern float fir_coeffs[];
   					  Diagnostics_DrawHMPlot(fir_coeffs, FIR_ORDER);
   				  }
-  				  else if (newState == STATE_PLOT_HM_FREQ) {
-  					  // New One-Shot Logic: Calculate the Frequency Response of the filter
-  					  Diagnostics_InitFilteredFFTGraph();
+  				else if (newState == STATE_PLOT_HM_FREQ) {
+  				    Diagnostics_InitFilteredFFTGraph();
 
-  					  // Zero-pad a temporary buffer with coefficients
-  					  for(int i=0; i<1024; i++) fft_output_array[i] = (i < FIR_ORDER) ? fir_coeffs[i] : 0.0f;
+  				    // ADD THIS LINE: Tells the drawing engine the screen is currently empty
+  				    Diagnostics_ResetFFTMemory();
 
-  					  arm_rfft_fast_f32(&fft_handler, fft_output_array, signal_samples, 0); // Reuse signal_samples as temp
-  					  arm_cmplx_mag_f32(signal_samples, fft_magnitudes, 512);
-  					  Diagnostics_UpdateRawFFT(fft_magnitudes);
-  				  }
+  				    // 1. Prepare buffer with coefficients
+  				    extern float fir_coeffs[];
+  				    for(int i=0; i<1024; i++) fft_output_array[i] = (i < FIR_ORDER) ? fir_coeffs[i] : 0.0f;
+
+  				    // 2. Perform FFT
+  				    arm_rfft_fast_f32(&fft_handler, fft_output_array, signal_samples, 0);
+  				    arm_cmplx_mag_f32(signal_samples, fft_magnitudes, 512);
+
+  				    // 3. Normalize for display
+  				    float max_mag = 0;
+  				    for(int i=1; i<512; i++) if(fft_magnitudes[i] > max_mag) max_mag = fft_magnitudes[i];
+  				    for(int i=1; i<512; i++) {
+  				        fft_magnitudes[i] = (fft_magnitudes[i] / max_mag) * 1048576.0f;
+  				    }
+
+  				    Diagnostics_UpdateRawFFT(fft_magnitudes);
+  				}
   				  else if (newState == STATE_PLOT_BUFFER_TIME || newState == STATE_PLOT_BUFFER_FREQ) {
   					  // For continuous signal plots, just initialize the axes once
   					  Diagnostics_InitFilteredFFTGraph();
