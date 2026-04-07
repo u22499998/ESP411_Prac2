@@ -33,4 +33,18 @@ void Diagnostics_InitRawFFTGraph(uint16_t origin_x, uint16_t origin_y,
 // Fast-updates only the changed pixels on the graph
 void Diagnostics_UpdateRawFFT(float* fft_magnitudes);
 
+// --- OUTPUT BUFFER GRAPHING FUNCTIONS ---
+
+// Time Domain
+void Diagnostics_InitTimeGraph(uint16_t origin_x, uint16_t origin_y,
+        uint16_t x_length, uint16_t y_length,
+        uint8_t num_x_indices, uint8_t num_y_indices);
+void Diagnostics_UpdateTimeGraph(float* time_buffer, uint16_t num_samples);
+
+// Filtered FFT Domain
+void Diagnostics_InitFilteredFFTGraph(uint16_t origin_x, uint16_t origin_y,
+        uint16_t x_length, uint16_t y_length,
+        uint8_t num_x_indices, uint8_t num_y_indices);
+void Diagnostics_UpdateFilteredFFT(float* fft_magnitudes);
+
 #endif // DIAGNOSTICS_H

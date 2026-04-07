@@ -1025,22 +1025,20 @@ void StartDefaultTask(void const * argument)
   uint16_t x = 0;
   uint16_t y = 0;
   arm_rfft_fast_init_f32(&fft_handler, 1024);
-  bool fft_graph_initialized = false;
+  bool graph_initialized = false;
+  DisplayState_t newState = currentState;
 
   /* Infinite loop */
   for(;;)
   {
 	  // --- 1. HANDLE TOUCH INPUT ---
 	          if (TouchDetected(&x, &y)) {
-	              DisplayState_t newState = currentState;
 
 	              if (currentState == STATE_MAIN_MENU) {
 	                  newState = MainMenu_HandleTouch(x, y, currentState);
 
 	                  if (newState == STATE_PLOT_RAW_FFT) {
-	                          currentState = newState;
-	                          // Reset the flag so the initialization function runs!
-	                          fft_graph_initialized = false;
+	                          graph_initialized = false;
 	                      }
 
 	                  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
@@ -1049,22 +1047,28 @@ void StartDefaultTask(void const * argument)
 	              else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER) {
 	                  newState = SubMenu_HandleTouch(x, y, currentState);
 	                  if (newState == STATE_MAIN_MENU) MainMenu_Draw();
-	                  else if (newState >= STATE_PLOT_HM_TIME) {
-	                      // Transitioning into a graph! Draw the axes ONCE.
-	                	  continue;
-	                  }
 	              }
-	              else if (currentState >= STATE_PLOT_HM_TIME) {
-//	                  // Touched while in a graph -> Escape back to Sub Menu
-//	                  newState = (currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ) ? STATE_SUB_HM : STATE_SUB_BUFFER;
-//	                  SubMenu_Draw(newState == STATE_SUB_HM ? "CALCULATE h[m]" : "OUTPUT BUFFER");
-	            	  continue;
-	              }
-	              else if (currentState == STATE_PLOT_RAW_FFT) {
+	              else if (currentState == STATE_PLOT_RAW_FFT || currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ || currentState == STATE_PLOT_BUFFER_TIME || currentState == STATE_PLOT_BUFFER_FREQ )
+	              {
+	            	  if (currentState == STATE_PLOT_RAW_FFT)
+					  {
+	            	  	  graph_initialized = false;
 	                      newState = STATE_MAIN_MENU;
 	                      MainMenu_Draw();
-	                      osDelay(300);
+					  }
+	            	  else if (currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ )
+	            	  {
+	            	  	  graph_initialized = false;
+	                      newState = STATE_SUB_HM;
+	                      SubMenu_Draw("CALCULATE h[m]");
 	                  }
+	            	  else
+	            	  {
+	            	  	  graph_initialized = false;
+	                      newState = STATE_SUB_BUFFER;
+	                      SubMenu_Draw("OUTPUT BUFFER");
+	            	  }
+	              }
 
 	              currentState = newState;
 	              HAL_Delay(150); // Debounce
@@ -1098,35 +1102,53 @@ void StartDefaultTask(void const * argument)
 //	                              dac_buffer[i] = (uint16_t)dac_val;
 //	                          }
 
+	          				// Just copy the raw input straight to the DAC buffer
+		          				for (int i = 0; i < 1024; i++) {
+		          				    // Add the DC offset back
+		          				    float dac_val = signal_samples[i];
+
+		          				    // Clamp
+		          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
+		          				    if (dac_val < 0.0f)    dac_val = 0.0f;
+
+		          				    dac_buffer[i] = (uint16_t)dac_val;
+		          				    output_samples[i] = dac_val;
+		          				}
+
 	          				// 3. Execute the Plotting State
 								if (currentState == STATE_PLOT_RAW_FFT) {
 									// 1. If we just entered this screen, draw the axes ONCE
-									if (!fft_graph_initialized) {
+									if (!graph_initialized) {
 										Diagnostics_InitRawFFTGraph(25,25,256, 175, 8, 5);
-										fft_graph_initialized = true;
+										graph_initialized = true;
 									}
 
-									// 2. Do the heavy math
 									arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
 									arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
 
-									// 3. Fast-draw the dynamic data!
 									Diagnostics_UpdateRawFFT(fft_magnitudes);
 
-
 								}
+								else if (currentState == STATE_PLOT_BUFFER_TIME) {
+									  if (!graph_initialized) {
+										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+										  graph_initialized = true;
+									  }
+									  // Plot the time domain of OUTPUT_SAMPLES
+									  Diagnostics_UpdateTimeGraph(output_samples, 1024);
+								  }
+								else if (currentState == STATE_PLOT_BUFFER_FREQ) {
+									  if (!graph_initialized) {
+										  Diagnostics_InitFilteredFFTGraph(25, 25, 256, 175, 8, 5);
+										  graph_initialized = true;
+									  }
+									  // Perform FFT on filtered OUTPUT_SAMPLES
+									  arm_rfft_fast_f32(&fft_handler, output_samples, fft_output_array, 0);
+									  arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+									  Diagnostics_UpdateRawFFT(fft_magnitudes);
+									  }
 
-	          				// Just copy the raw input straight to the DAC buffer
-	          				for (int i = 0; i < 1024; i++) {
-	          				    // Add the DC offset back
-	          				    float dac_val = signal_samples[i];
 
-	          				    // Clamp
-	          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
-	          				    if (dac_val < 0.0f)    dac_val = 0.0f;
-
-	          				    dac_buffer[i] = (uint16_t)dac_val;
-	          				}
 
 
 	          	          }
