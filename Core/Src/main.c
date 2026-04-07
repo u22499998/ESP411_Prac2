@@ -1086,8 +1086,8 @@ void StartDefaultTask(void const * argument)
 	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
 	          				}
 
-//	                          // 2. Run the digital FIR filter using your new module
-//	                          // This function takes the input array, processes it, and fills the output array
+	                          // 2. Run the digital FIR filter using your new module
+	                          // This function takes the input array, processes it, and fills the output array
 //	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
 //
 //	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
@@ -1152,6 +1152,7 @@ void StartDefaultTask(void const * argument)
 
 
 	          	          }
+	          osDelay(10);
 
 	      }
   /* USER CODE END 5 */
