@@ -11,13 +11,15 @@
 #include <stdint.h>
 
 // --- FIR Filter Specifications ---
-#define FIR_FS       176470.59f  // Sampling rate
+#define FIR_FS       44117.647f  // Sampling rate
 #define FIR_FP       1500.0f   // Passband edge
 #define FIR_F_STOP   3000.0f   // Stopband edge
-#define FIR_FC       ((FIR_FP + FIR_F_STOP) / 2.0f) // Cutoff frequency
+//#define FIR_FC       ((FIR_FP + FIR_F_STOP) / 2.0f) // Cutoff frequency
+#define FIR_FC       (1750 / 2.0f) // Cutoff frequency
+
 
 // Calculated Order: 3.3 * (48000 / 1500) = 105.6 -> round to odd 107
-#define FIR_ORDER    389
+#define FIR_ORDER    117
 
 // --- Public Function Prototypes ---
 void FIR_Init(void);
