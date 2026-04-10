@@ -287,7 +287,7 @@ void Diagnostics_UpdateTimeGraph(float* time_buffer, uint16_t buffer_size) {
         // --- Y-AXIS SCALING (0.0V to 3.3V) ---
         // 1. Convert raw 12-bit ADC value (0-4095) to Voltage (0.0-3.3)
         // (If your buffer is already in volts, skip this and just use time_buffer[i])
-        float voltage = (time_buffer[i] / 4095.0f) * 3.3f;
+        float voltage = (time_buffer[i] / 4096.0f) * 3.3f;
 
         // 2. Clamp voltage for safety to prevent drawing outside the graph area
         if (voltage < 0.0f) voltage = 0.0f;

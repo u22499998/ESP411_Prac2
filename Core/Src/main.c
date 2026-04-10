@@ -198,7 +198,7 @@ int main(void)
 	HAL_ADC_Start(&hadc2);
 
 	// Start the Master ADC and the DMA engine
-	HAL_ADCEx_MultiModeStart_DMA(&hadc1, dma_packed_buffer, 513);
+	HAL_ADCEx_MultiModeStart_DMA(&hadc1, dma_packed_buffer, 512);
 
 	 // Trigger the DMA to push the buffer to the DAC at exactly 48kHz
 	  // DMA in Circular or Normal mode
@@ -512,7 +512,7 @@ static void MX_DAC_Init(void)
   /** DAC channel OUT2 config
   */
   sConfig.DAC_Trigger = DAC_TRIGGER_T7_TRGO;
-  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
+  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_DISABLE;
   if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
@@ -774,7 +774,7 @@ static void MX_TIM7_Init(void)
   htim7.Instance = TIM7;
   htim7.Init.Prescaler = 0;
   htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim7.Init.Period = 1632;
+  htim7.Init.Period = 816;
   htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
   {
@@ -1086,34 +1086,35 @@ void StartDefaultTask(void const * argument)
 	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
 	          				}
 
-	                          // 2. Run the digital FIR filter using your new module
-	                          // This function takes the input array, processes it, and fills the output array
-	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
-
-	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
-	                          for (int i = 0; i < 1024; i++) {
-	                              // Add the 2048 DC offset back so the wave is centered properly
-	                              float dac_val = output_samples[i];
-
-	                              // Clamp values to prevent integer overflow/underflow screeching
-	                              if (dac_val > 4095.0f) dac_val = 4095.0f;
-	                              if (dac_val < 0.0f)    dac_val = 0.0f;
-
-	                              dac_buffer[i] = (uint16_t)dac_val;
-	                          }
+//	                          // 2. Run the digital FIR filter using your new module
+//	                          // This function takes the input array, processes it, and fills the output array
+//	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
+//
+//	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
+//	                          for (int i = 0; i < 1024; i++) {
+//	                              // Add the 2048 DC offset back so the wave is centered properly
+//	                              float dac_val = output_samples[i];
+//
+//	                              // Clamp values to prevent integer overflow/underflow screeching
+//	                              if (dac_val > 4095.0f) dac_val = 4095.0f;
+//	                              if (dac_val < 0.0f)    dac_val = 0.0f;
+//
+//	                              dac_buffer[i] = (uint16_t)dac_val;
+//	                          }
 
 	          				// Just copy the raw input straight to the DAC buffer
-//		          				for (int i = 0; i < 1024; i++) {
-//		          				    // Add the DC offset back
-//		          				    float dac_val = signal_samples[i];
-//
-//		          				    // Clamp
-//		          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
-//		          				    if (dac_val < 0.0f)    dac_val = 0.0f;
-//
-//		          				    dac_buffer[i] = (uint16_t)dac_val;
-//		          				    output_samples[i] = dac_val;
-//		          				}
+		          				for (int i = 0; i < 1024; i++) {
+		          				    // Add the DC offset back
+		          				    float dac_val = signal_samples[i];
+
+		          				    // Clamp
+		          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
+		          				    if (dac_val < 0.0f)    dac_val = 0.0f;
+
+		          				    dac_buffer[i] = (uint16_t)dac_val;
+		          				    output_samples[i] = dac_val;
+		          				}
+
 
 	          				// 3. Execute the Plotting State
 								if (currentState == STATE_PLOT_RAW_FFT) {
@@ -1152,7 +1153,6 @@ void StartDefaultTask(void const * argument)
 
 
 	          	          }
-	          osDelay(10);
 
 	      }
   /* USER CODE END 5 */
