@@ -1037,24 +1037,21 @@ void StartDefaultTask(void const * argument)
 	              if (currentState == STATE_MAIN_MENU) {
 	                  newState = MainMenu_HandleTouch(x, y, currentState);
 
-	                  if (newState == STATE_PLOT_RAW_FFT) {
-	                          graph_initialized = false;
-	                      }
-
-	                  if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
+	                  if (newState == STATE_SAMPLED) SubMenu_Draw("SAMPLED SIGNAL");
+	                  else if (newState == STATE_SUB_HM) SubMenu_Draw("CALCULATE h[m]");
 	                  else if (newState == STATE_SUB_BUFFER) SubMenu_Draw("OUTPUT BUFFER");
 	              }
-	              else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER) {
+	              else if (currentState == STATE_SUB_HM || currentState == STATE_SUB_BUFFER || currentState == STATE_SAMPLED) {
 	                  newState = SubMenu_HandleTouch(x, y, currentState);
 	                  if (newState == STATE_MAIN_MENU) MainMenu_Draw();
 	              }
-	              else if (currentState == STATE_PLOT_RAW_FFT || currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ || currentState == STATE_PLOT_BUFFER_TIME || currentState == STATE_PLOT_BUFFER_FREQ )
+	              else if (currentState == STATE_PLOT_RAW_FFT || currentState == STATE_PLOT_RAW_TIME || currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ || currentState == STATE_PLOT_BUFFER_TIME || currentState == STATE_PLOT_BUFFER_FREQ )
 	              {
-	            	  if (currentState == STATE_PLOT_RAW_FFT)
+	            	  if (currentState == STATE_PLOT_RAW_FFT || currentState == STATE_PLOT_RAW_TIME)
 					  {
 	            	  	  graph_initialized = false;
-	                      newState = STATE_MAIN_MENU;
-	                      MainMenu_Draw();
+	                      newState = STATE_SAMPLED;
+	                      SubMenu_Draw("SAMPLED SIGNAL");
 					  }
 	            	  else if (currentState == STATE_PLOT_HM_TIME || currentState == STATE_PLOT_HM_FREQ )
 	            	  {
@@ -1129,6 +1126,13 @@ void StartDefaultTask(void const * argument)
 
 									Diagnostics_UpdateRawFFT(fft_magnitudes);
 
+								}else if (currentState ==  STATE_PLOT_RAW_TIME){
+									  if (!graph_initialized) {
+										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+										  graph_initialized = true;
+									  }
+									  // Plot the time domain of OUTPUT_SAMPLES
+									  Diagnostics_UpdateTimeGraph(signal_samples, 1024);
 								}
 								else if (currentState == STATE_PLOT_BUFFER_TIME) {
 									  if (!graph_initialized) {

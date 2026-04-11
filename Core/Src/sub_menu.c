@@ -31,7 +31,11 @@ DisplayState_t SubMenu_HandleTouch(uint16_t x, uint16_t y, DisplayState_t curren
     }
 
     // Route based on WHICH sub-menu we are currently in
-    if (currentState == STATE_SUB_HM) {
+    if (currentState == STATE_SAMPLED) {
+        if (y > 80 && y < 130) return STATE_PLOT_RAW_TIME;
+        if (y > 160 && y < 210) return STATE_PLOT_RAW_FFT;
+    }
+    else if (currentState == STATE_SUB_HM) {
         if (y > 80 && y < 130) return STATE_PLOT_HM_TIME;
         if (y > 160 && y < 210) return STATE_PLOT_HM_FREQ;
     }

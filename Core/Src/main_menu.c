@@ -18,7 +18,7 @@ void MainMenu_Draw(void) {
     BSP_LCD_DisplayStringAt(0, 20, (uint8_t*)"SYSTEM MONITOR", CENTER_MODE);
 
     // Draw the two main buttons
-    UI_Draw3DButton(40, 80, 160, 50, "1. Raw ADC FFT", false);
+    UI_Draw3DButton(40, 80, 160, 50, "1. Sampled Signal", false);
     UI_Draw3DButton(40, 145, 160, 50, "2. Calculate h[m]", false);
     UI_Draw3DButton(40, 210, 160, 50, "3. Output Buffer", false);
 }
@@ -26,15 +26,15 @@ void MainMenu_Draw(void) {
 DisplayState_t MainMenu_HandleTouch(uint16_t x, uint16_t y, DisplayState_t currentState) {
 	if (x > 40 && x < 200) {
 	        if (y > 80 && y < 130) {
-	            UI_Draw3DButton(40, 80, 160, 50, "1. Raw ADC FFT", true);
+//	            UI_Draw3DButton(40, 80, 160, 50, "1. Sampled Signal", true);
 	            return  STATE_PLOT_RAW_FFT;
 	        }
 	        if (y > 145 && y < 195) {
-	            UI_Draw3DButton(40, 160, 160, 50, "2. Calculate h[m]", true);
+//	            UI_Draw3DButton(40, 160, 160, 50, "2. Calculate h[m]", true);
 	            return STATE_SUB_HM ;
 	        }
 	        if (y > 210 && y < 260) {
-	            UI_Draw3DButton(40, 210, 160, 50, "3. Output Buffer", true);
+//	            UI_Draw3DButton(40, 210, 160, 50, "3. Output Buffer", true);
 	            return STATE_SUB_BUFFER ; // Route to the new FFT plot
 	        }
 	    }
