@@ -40,7 +40,7 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 DisplayState_t currentState = STATE_MAIN_MENU;
-uint32_t dma_packed_buffer[512];
+uint32_t dma_packed_buffer[1536];
 volatile uint8_t dma_half_ready = 0;
 volatile uint8_t dma_full_ready = 0;
 
@@ -1085,14 +1085,18 @@ void StartDefaultTask(void const * argument)
 	          if (dma_half_ready)
 	          {
 	              dma_half_ready = 0;
-
+	              uint16_t* raw_samples = (uint16_t*)dma_packed_buffer; //out unbpacks for us into 16 bit values
 	              // 1. Unpack first half of packed buffer (Indices 0 to 255 -> 512 samples)
-	              int n = 0;
-	              for (int i = 0; i < 256; i++) {
-	                  signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
-	                  signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
-	              }
+	              // 1. Unpack, Average, and Decimate
+					for (int i = 0; i < 512; i++) {
+						// Grab the clump of 3 interleaved samples
+						uint16_t s1 = raw_samples[(i * 3) + 0]; // ADC1
+						uint16_t s2 = raw_samples[(i * 3) + 1]; // ADC2
+						uint16_t s3 = raw_samples[(i * 3) + 2]; // ADC3
 
+						// Average them into one superior float!
+						signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+					}
 	              // 2. Process first half ONLY (Pass 512 as the length!)
 	              FIR_ProcessBlock(&signal_samples[0], &output_samples[0], 512);
 
@@ -1107,14 +1111,20 @@ void StartDefaultTask(void const * argument)
 	          // --- PONG: PROCESS THE SECOND HALF ---
 	          if (dma_full_ready)
 	          	          {
-	        	  dma_full_ready = 0;
+						  dma_full_ready = 0;
+						  uint16_t* raw_samples = (uint16_t*)dma_packed_buffer;
+						  // Pong starts exactly at index 1536.
+						  int pong_offset = 1536;
 
-	          	        	// 1. Unpack ADC DMA data into floats
-	          				int n = 512;
-	          				for (int i = 256; i < 512; i += 1) {
-	          					signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
-	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
-	          				}
+	        	  	  	  // 1. Unpack, Average, and Decimate
+	        	                for (int i = 0; i < 512; i++) {
+	        	                    uint16_t s1 = raw_samples[pong_offset + (i * 3) + 0];
+	        	                    uint16_t s2 = raw_samples[pong_offset + (i * 3) + 1];
+	        	                    uint16_t s3 = raw_samples[pong_offset + (i * 3) + 2];
+
+	        	                    // Write to the second half of the float array
+	        	                    signal_samples[512 + i] = (float)(s1 + s2 + s3) / 3.0f;
+	        	                }
 
 	                          // 2. Run the digital FIR filter using your new module
 //	                           This function takes the input array, processes it, and fills the output array
