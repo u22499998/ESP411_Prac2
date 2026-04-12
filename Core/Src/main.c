@@ -41,7 +41,8 @@
 /* USER CODE BEGIN PTD */
 DisplayState_t currentState = STATE_MAIN_MENU;
 uint32_t dma_packed_buffer[512];
-volatile uint8_t dma_data_ready = 0;
+volatile uint8_t dma_half_ready = 0;
+volatile uint8_t dma_full_ready = 0;
 
 /* USER CODE END PTD */
 
@@ -1001,11 +1002,20 @@ bool TouchDetected(uint16_t* x_coord, uint16_t* y_coord) {
     return false; // No touch detected
 }
 
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
+{
+    if(hadc->Instance == ADC1)
+    {
+        dma_half_ready = 1;
+    }
+}
+
+// UPDATE THIS FUNCTION:
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if(hadc->Instance == ADC1)
     {
-    	dma_data_ready = 1;
+        dma_full_ready = 1; // Change to your new flag name
     }
 }
 /* USER CODE END 4 */
@@ -1071,24 +1081,47 @@ void StartDefaultTask(void const * argument)
 	              HAL_Delay(150); // Debounce
 	          }
 
-	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
-	          if (dma_data_ready)
+	          // --- PING: PROCESS THE FIRST HALF ---
+	          if (dma_half_ready)
+	          {
+	              dma_half_ready = 0;
+
+	              // 1. Unpack first half of packed buffer (Indices 0 to 255 -> 512 samples)
+	              int n = 0;
+	              for (int i = 0; i < 256; i++) {
+	                  signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
+	                  signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
+	              }
+
+	              // 2. Process first half ONLY (Pass 512 as the length!)
+	              FIR_ProcessBlock(&signal_samples[0], &output_samples[0], 512);
+
+	              // 3. Pack DAC buffer first half
+	              for (int i = 0; i < 512; i++) {
+	                  float dac_val = output_samples[i];
+	                  if (dac_val > 4095.0f) dac_val = 4095.0f;
+	                  if (dac_val < 0.0f)    dac_val = 0.0f;
+	                  dac_buffer[i] = (uint16_t)dac_val;
+	              }
+	          }
+	          // --- PONG: PROCESS THE SECOND HALF ---
+	          if (dma_full_ready)
 	          	          {
-	          			    dma_data_ready = 0;
+	        	  dma_full_ready = 0;
 
 	          	        	// 1. Unpack ADC DMA data into floats
-	          				int n = 0;
-	          				for (int i = 0; i < 512; i += 1) {
+	          				int n = 512;
+	          				for (int i = 256; i < 512; i += 1) {
 	          					signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
 	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
 	          				}
 
 	                          // 2. Run the digital FIR filter using your new module
 //	                           This function takes the input array, processes it, and fills the output array
-	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
+	                          FIR_ProcessBlock(signal_samples[512], output_samples[512], 512);
 
 	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
-	                          for (int i = 0; i < 1024; i++) {
+	                          for (int i = 512; i < 1024; i++) {
 	                              // Add the 2048 DC offset back so the wave is centered properly
 	                              float dac_val = output_samples[i];
 
