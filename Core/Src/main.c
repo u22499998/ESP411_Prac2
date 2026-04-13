@@ -40,8 +40,10 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 DisplayState_t currentState = STATE_MAIN_MENU;
-uint32_t dma_packed_buffer[512];
+uint32_t dma_packed_buffer[1536];
 volatile uint8_t dma_data_ready = 0;
+volatile uint8_t dma_half_ready = 0;
+volatile uint8_t dma_full_ready = 0;
 
 /* USER CODE END PTD */
 
@@ -83,7 +85,6 @@ SDRAM_HandleTypeDef hsdram1;
 
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
-float signal_samples[1024]; // Unpacked floating-point input
 float output_samples[1024]; // Filtered floating-point output
 uint16_t dac_buffer[1024];  // Formatted 12-bit integer output for the DAC
 arm_rfft_fast_instance_f32 fft_handler;
@@ -198,7 +199,7 @@ int main(void)
 	HAL_ADC_Start(&hadc2);
 
 	// Start the Master ADC and the DMA engine
-	HAL_ADCEx_MultiModeStart_DMA(&hadc1, dma_packed_buffer, 512);
+	HAL_ADCEx_MultiModeStart_DMA(&hadc1, dma_packed_buffer, 1536);
 
 	 // Trigger the DMA to push the buffer to the DAC at exactly 48kHz
 	  // DMA in Circular or Normal mode
@@ -774,7 +775,7 @@ static void MX_TIM7_Init(void)
   htim7.Instance = TIM7;
   htim7.Init.Prescaler = 0;
   htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim7.Init.Period = 816;
+  htim7.Init.Period = 2448;
   htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
   {
@@ -1001,11 +1002,20 @@ bool TouchDetected(uint16_t* x_coord, uint16_t* y_coord) {
     return false; // No touch detected
 }
 
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc)
+{
+    if(hadc->Instance == ADC1)
+    {
+        dma_half_ready = 1;
+    }
+}
+
+// UPDATE THIS FUNCTION:
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if(hadc->Instance == ADC1)
     {
-    	dma_data_ready = 1;
+        dma_full_ready = 1; // Change to your new flag name
     }
 }
 /* USER CODE END 4 */
@@ -1027,6 +1037,7 @@ void StartDefaultTask(void const * argument)
   arm_rfft_fast_init_f32(&fft_handler, 1024);
   bool graph_initialized = false;
   DisplayState_t newState = currentState;
+  float signal_samples[1024];
 
   /* Infinite loop */
   for(;;)
@@ -1072,15 +1083,46 @@ void StartDefaultTask(void const * argument)
 	          }
 
 	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
-	          if (dma_data_ready)
-	          	          {
-	          			    dma_data_ready = 0;
+//	          if (dma_half_ready){
+//	        	  dma_half_ready = 0;
+//      			  uint16_t* raw_samples = (uint16_t*)dma_packed_buffer;
+//      				for (int i = 0; i < 512; i++) {
+//      					uint16_t s1 = raw_samples[(i * 3) + 0]; // ADC1
+//						uint16_t s2 = raw_samples[(i * 3) + 1]; // ADC2
+//						uint16_t s3 = raw_samples[(i * 3) + 2]; // ADC3
+//
+//						// Average them into one superior float!
+//						signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+//      				}
+//
+//      				// Just copy the raw input straight to the DAC buffer
+//                      for (int i = 0; i < 512; i++) {
+//          				    // Add the DC offset back
+//          				    float dac_val = signal_samples[i];
+//
+//          				    // Clamp
+//          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
+//          				    if (dac_val < 0.0f)    dac_val = 0.0f;
+//
+//          				    dac_buffer[i] = (uint16_t)dac_val;
+//          				    output_samples[i] = dac_val;
+//          				}
+//
+//	          }
+	           if (dma_full_ready)
+				  {
+	          			    dma_full_ready = 0;
 
 	          	        	// 1. Unpack ADC DMA data into floats
-	          				int n = 0;
-	          				for (int i = 0; i < 512; i += 1) {
-	          					signal_samples[n++] = (float)(dma_packed_buffer[i] & 0xFFFF);
-	          					signal_samples[n++] = (float)(dma_packed_buffer[i] >> 16);
+	          			  uint16_t* raw_samples = (uint16_t*)dma_packed_buffer;
+	          				for (int i = 0; i < 1024; i++) {
+	          					uint16_t s1 = raw_samples[(i * 3) + 0]; // ADC1
+								uint16_t s2 = raw_samples[(i * 3) + 1]; // ADC2
+								uint16_t s3 = raw_samples[(i * 3) + 2]; // ADC3
+
+								// Average them into one superior float!
+								signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+
 	          				}
 
 	                          // 2. Run the digital FIR filter using your new module
@@ -1100,7 +1142,7 @@ void StartDefaultTask(void const * argument)
 	                          }
 
 	          				// Just copy the raw input straight to the DAC buffer
-//		          				for (int i = 0; i < 1024; i++) {
+//	                          for (int i = 0; i < 1024; i++) {
 //		          				    // Add the DC offset back
 //		          				    float dac_val = signal_samples[i];
 //
