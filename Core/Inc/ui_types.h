@@ -30,7 +30,8 @@ typedef enum {
     STATE_PLOT_HM_TIME,
     STATE_PLOT_HM_FREQ,
     STATE_PLOT_BUFFER_TIME,
-    STATE_PLOT_BUFFER_FREQ
+    STATE_PLOT_BUFFER_FREQ,
+	STATE_PLOT_BUFFER_PERSIST
 } DisplayState_t;
 
 // A shared utility function for 3D buttons

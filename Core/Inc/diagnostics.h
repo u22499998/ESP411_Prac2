@@ -47,4 +47,7 @@ void Diagnostics_InitFilteredFFTGraph(uint16_t origin_x, uint16_t origin_y,
         uint8_t num_x_indices, uint8_t num_y_indices);
 void Diagnostics_UpdateFilteredFFT(float* fft_magnitudes);
 
+void Diagnostics_UpdateFilteredFFTPersist(float* fft_magnitudes);
+void Diagnostics_DrawHMPlot(const float* coeffs, uint16_t num_taps);
+
 #endif // DIAGNOSTICS_H
