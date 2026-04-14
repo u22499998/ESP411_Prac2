@@ -451,4 +451,119 @@ void Diagnostics_UpdateFilteredFFT(float* fft_magnitudes) {
     }
 }
 
+/**
+ * @brief Output Buffer FFT with Two-Tone Live Signal and Infinite Peak Hold
+ */
+void Diagnostics_UpdateFilteredFFTPersist(float* fft_magnitudes) {
+    // Track both the live signal and the infinite peak
+    static uint16_t prev_current[256] = {0};
+    static float peak_heights[256] = {0};
+    static uint16_t prev_peaks[256] = {0};
+
+    for (int i = 1; i < 256; i++) {
+        uint16_t x = 25 + i;
+
+        // --- 1. SCALE MATH ---
+        float mag = fft_magnitudes[i];
+        if (mag < 1.0f) mag = 1.0f;
+
+        float db = 20.0f * log10f(mag / 1048576.0f);
+        int magnitude = 174 + (int)(db * 2.5f);
+
+        if (magnitude < 0) magnitude = 0;
+        if (magnitude > 174) magnitude = 174;
+
+        uint16_t curr_h = (uint16_t)magnitude;
+
+        // --- 2. INFINITE PEAK HOLD LOGIC ---
+        if (magnitude > peak_heights[i]) {
+            peak_heights[i] = (float)magnitude; // Fast attack, updates new maximum
+        }
+        // Decay subtraction has been completely removed. Peaks hold permanently.
+
+        uint16_t peak_h = (uint16_t)peak_heights[i];
+        uint16_t old_curr_h = prev_current[i];
+        uint16_t old_peak_h = prev_peaks[i];
+
+        // --- 3. DRAWING LOGIC ---
+
+        // A. Update the Live Signal (CYAN) and the Maximum Peak Trail (MAGENTA)
+        if (curr_h > old_curr_h) {
+            // Signal grew: Draw live Cyan over the old trail
+            BSP_LCD_SetTextColor(LCD_COLOR_CYAN);
+            BSP_LCD_DrawHLine(26 + old_curr_h, x, curr_h - old_curr_h);
+        }
+        else if (curr_h < old_curr_h) {
+            // Signal shrank: The exposed area becomes the permanent Magenta trail
+            BSP_LCD_SetTextColor(LCD_COLOR_MAGENTA);
+            BSP_LCD_DrawHLine(26 + curr_h, x, old_curr_h - curr_h);
+        }
+
+        // B. Erase block logic (This will now only execute if you manually clear the static array,
+        //    but is kept intact to prevent visual bugs if the data is ever reset).
+        if (peak_h < old_peak_h) {
+            uint32_t bg_color = COLOR_BG;
+            if ((x - 25) % 32 == 0) bg_color = LCD_COLOR_LIGHTGRAY; // Vertical grid lines
+
+            BSP_LCD_SetTextColor(bg_color);
+            BSP_LCD_DrawHLine(26 + peak_h, x, old_peak_h - peak_h);
+
+            // Redraw horizontal grid tick marks if we erased over them
+            for (int grid = 1; grid <= 5; grid++) {
+                uint16_t tick_y = 25 + (grid * 35);
+                if (tick_y >= (26 + peak_h) && tick_y <= (26 + old_peak_h)) {
+                    DrawPixelLandscape(x, tick_y, LCD_COLOR_LIGHTGRAY);
+                }
+            }
+        }
+
+        // Save state for the next frame
+        prev_current[i] = curr_h;
+        prev_peaks[i] = peak_h;
+    }
+}
+
+/**
+ * @brief Draws the static Filter Coefficients h[m]
+ */
+void Diagnostics_DrawHMPlot(const float* coefficients, uint16_t order) {
+    BSP_LCD_Clear(COLOR_BG);
+
+    // 1. Draw Axis Lines
+    BSP_LCD_SetTextColor(LCD_COLOR_CYAN);
+    BSP_LCD_DrawLine(120, 40, 120, 280); // X-axis (Center)
+    BSP_LCD_DrawLine(20, 40, 220, 40);   // Y-axis (Left)
+
+    // 2. Add Axis Headings (Titles)
+    BSP_LCD_SetFont(&Font16);
+    BSP_LCD_SetTextColor(COLOR_TEXT);
+    // Main Title
+    UI_DrawRotatedString(80, 230, "Impulse Response h[m]");
+
+    // 3. Add Axis Labels
+    BSP_LCD_SetFont(&Font12);
+    // Y-Axis Label (Amplitude) - Near the vertical axis
+    UI_DrawRotatedString(10, 140, "Amp");
+
+    // X-Axis Label (Sample Index) - At the far end of the horizontal axis
+    UI_DrawRotatedString(260, 110, "m");
+
+    // 4. Draw the actual sinc data...
+    BSP_LCD_SetTextColor(LCD_COLOR_YELLOW);
+    for (int i = 0; i < order - 1; i++) {
+            // Find center (120) and scale (800.0f).
+            // Increase 800.0f if the line is too flat.
+    	int y1 = 120 + (int)(coefficients[i] * 800.0f);
+    	int y2 = 120 + (int)(coefficients[i+1] * 800.0f);
+
+            // Map index to the 240-pixel wide plot area (from x=40 to x=280)
+            int x1 = 40 + (i * 240 / order);
+            int x2 = 40 + ((i + 1) * 240 / order);
+
+            // Map Cartesian to Physical coordinates:
+            // Physical X = Cartesian Y, Physical Y = Cartesian X
+            BSP_LCD_DrawLine(y1, x1, y2, x2);
+        }
+}
+
 

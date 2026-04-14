@@ -72,3 +72,10 @@ void FIR_ProcessBlock(float* input_block, float* output_block, uint32_t block_si
     }
 }
 
+/**
+ * @brief Returns a read-only pointer to the calculated coefficients
+ */
+const float* FIR_GetCoeffs(void) {
+    return fir_coeffs; // Make sure this matches your actual array name
+}
+

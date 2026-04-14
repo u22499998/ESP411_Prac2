@@ -1155,47 +1155,62 @@ void StartDefaultTask(void const * argument)
 //		          				}
 
 
-	          				// 3. Execute the Plotting State
-								if (currentState == STATE_PLOT_RAW_FFT) {
-									// 1. If we just entered this screen, draw the axes ONCE
-									if (!graph_initialized) {
-										Diagnostics_InitRawFFTGraph(25,25,256, 175, 8, 5);
-										graph_initialized = true;
-									}
+	                          // 3. Execute the Plotting State
+	                          								if (currentState == STATE_PLOT_RAW_FFT) {
+	                          									// 1. If we just entered this screen, draw the axes ONCE
+	                          									if (!graph_initialized) {
+	                          										Diagnostics_InitRawFFTGraph(25,25,256, 175, 8, 5);
+	                          										graph_initialized = true;
+	                          									}
 
-									arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
-									arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+	                          									arm_rfft_fast_f32(&fft_handler, signal_samples, fft_output_array, 0);
+	                          									arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
 
-									Diagnostics_UpdateRawFFT(fft_magnitudes);
+	                          									Diagnostics_UpdateRawFFT(fft_magnitudes);
 
-								}else if (currentState ==  STATE_PLOT_RAW_TIME){
-									  if (!graph_initialized) {
-										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
-										  graph_initialized = true;
-									  }
-									  // Plot the time domain of OUTPUT_SAMPLES
-									  Diagnostics_UpdateTimeGraph(signal_samples, 1024);
-								}
-								else if (currentState == STATE_PLOT_BUFFER_TIME) {
-									  if (!graph_initialized) {
-										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
-										  graph_initialized = true;
-									  }
-									  // Plot the time domain of OUTPUT_SAMPLES
-									  Diagnostics_UpdateTimeGraph(output_samples, 1024);
-								  }
-								else if (currentState == STATE_PLOT_BUFFER_FREQ) {
-									  if (!graph_initialized) {
-										  Diagnostics_InitFilteredFFTGraph(25, 25, 256, 175, 8, 5);
-										  graph_initialized = true;
-									  }
-									  // Perform FFT on filtered OUTPUT_SAMPLES
-									  arm_rfft_fast_f32(&fft_handler, output_samples, fft_output_array, 0);
-									  arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
-									  Diagnostics_UpdateRawFFT(fft_magnitudes);
-									  }
-
-
+	                          								}else if (currentState ==  STATE_PLOT_RAW_TIME){
+	                          									  if (!graph_initialized) {
+	                          										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+	                          										  graph_initialized = true;
+	                          									  }
+	                          									  // Plot the time domain of OUTPUT_SAMPLES
+	                          									  Diagnostics_UpdateTimeGraph(signal_samples, 1024);
+	                          								}
+	                          								// --- ADDED: TIME DOMAIN BUTTON FOR h[m] (Stem Plot) ---
+	                          								else if (currentState == STATE_PLOT_HM_TIME) {
+	                          									  if (!graph_initialized) {
+	                          										  Diagnostics_DrawHMPlot(FIR_GetCoeffs(), FIR_ORDER);
+	                          										  graph_initialized = true;
+	                          									  }
+	                          								}
+	                          								// --- ADDED: FREQ DOMAIN BUTTON FOR h[m] (Infinite Persist Hijack) ---
+	                          								else if (currentState == STATE_PLOT_HM_FREQ) {
+	                          									  if (!graph_initialized) {
+	                          										  Diagnostics_InitFilteredFFTGraph(25, 25, 256, 175, 8, 5);
+	                          										  graph_initialized = true;
+	                          									  }
+	                          									  arm_rfft_fast_f32(&fft_handler, output_samples, fft_output_array, 0);
+	                          									  arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+	                          									  Diagnostics_UpdateFilteredFFTPersist(fft_magnitudes);
+	                          								}
+	                          								else if (currentState == STATE_PLOT_BUFFER_TIME) {
+	                          									  if (!graph_initialized) {
+	                          										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+	                          										  graph_initialized = true;
+	                          									  }
+	                          									  // Plot the time domain of OUTPUT_SAMPLES
+	                          									  Diagnostics_UpdateTimeGraph(output_samples, 1024);
+	                          								  }
+	                          								else if (currentState == STATE_PLOT_BUFFER_FREQ) {
+	                          									  if (!graph_initialized) {
+	                          										  Diagnostics_InitFilteredFFTGraph(25, 25, 256, 175, 8, 5);
+	                          										  graph_initialized = true;
+	                          									  }
+	                          									  // Perform FFT on filtered OUTPUT_SAMPLES
+	                          									  arm_rfft_fast_f32(&fft_handler, output_samples, fft_output_array, 0);
+	                          									  arm_cmplx_mag_f32(fft_output_array, fft_magnitudes, 512);
+	                          									  Diagnostics_UpdateRawFFT(fft_magnitudes);
+	                          									  }
 
 
 	          	          }

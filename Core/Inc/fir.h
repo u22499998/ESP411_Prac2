@@ -21,6 +21,8 @@
 // Calculated Order: 3.3 * (48000 / 1250) = 105.6 -> round to odd 107
 #define FIR_ORDER    71
 
+const float* FIR_GetCoeffs(void);
+
 // --- Public Function Prototypes ---
 void FIR_Init(void);
 void FIR_ProcessBlock(float* input_block, float* output_block, uint32_t block_size);
