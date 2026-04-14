@@ -1083,63 +1083,59 @@ void StartDefaultTask(void const * argument)
 	          }
 
 	          // --- 2. HANDLE CONTINUOUS PLOTTING ---
-//	          if (dma_half_ready){
-//	        	  dma_half_ready = 0;
-//      			  uint16_t* raw_samples = (uint16_t*)dma_packed_buffer;
-//      				for (int i = 0; i < 512; i++) {
-//      					uint16_t s1 = raw_samples[(i * 3) + 0]; // ADC1
-//						uint16_t s2 = raw_samples[(i * 3) + 1]; // ADC2
-//						uint16_t s3 = raw_samples[(i * 3) + 2]; // ADC3
-//
-//						// Average them into one superior float!
-//						signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
-//      				}
-//
-//      				// Just copy the raw input straight to the DAC buffer
-//                      for (int i = 0; i < 512; i++) {
-//          				    // Add the DC offset back
-//          				    float dac_val = signal_samples[i];
-//
-//          				    // Clamp
-//          				    if (dac_val > 4095.0f) dac_val = 4095.0f;
-//          				    if (dac_val < 0.0f)    dac_val = 0.0f;
-//
-//          				    dac_buffer[i] = (uint16_t)dac_val;
-//          				    output_samples[i] = dac_val;
-//          				}
-//
-//	          }
-	           if (dma_full_ready)
-				  {
-	          			    dma_full_ready = 0;
+	          // --- PROCESS FIRST HALF (Ping) ---
+	          if (dma_half_ready) {
+	              dma_half_ready = 0;
 
-	          	        	// 1. Unpack ADC DMA data into floats
-	          			  uint16_t* raw_samples = (uint16_t*)dma_packed_buffer;
-	          				for (int i = 0; i < 1024; i++) {
-	          					uint16_t s1 = raw_samples[(i * 3) + 0]; // ADC1
-								uint16_t s2 = raw_samples[(i * 3) + 1]; // ADC2
-								uint16_t s3 = raw_samples[(i * 3) + 2]; // ADC3
+	              uint16_t* raw_samples = (uint16_t*)dma_packed_buffer;
 
-								// Average them into one superior float!
-								signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+	              // 1. Unpack the first 512 samples
+	              for (int i = 0; i < 512; i++) {
+	                  uint16_t s1 = raw_samples[(i * 3) + 0];
+	                  uint16_t s2 = raw_samples[(i * 3) + 1];
+	                  uint16_t s3 = raw_samples[(i * 3) + 2];
+	                  signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+	              }
 
-	          				}
+	              // 2. Filter the first half
+	              // Pass the starting address of the array, and process 512 samples
+	              FIR_ProcessBlock(&signal_samples[0], &output_samples[0], 512);
 
-	                          // 2. Run the digital FIR filter using your new module
-//	                           This function takes the input array, processes it, and fills the output array
-	                          FIR_ProcessBlock(signal_samples, output_samples, 1024);
+	              // 3. Format the first half for the DAC
+	              for (int i = 0; i < 512; i++) {
+	                  float dac_val = output_samples[i];
+	                  if (dac_val > 4095.0f) dac_val = 4095.0f;
+	                  if (dac_val < 0.0f)    dac_val = 0.0f;
+	                  dac_buffer[i] = (uint16_t)dac_val;
+	              }
+	          }
 
-	                          // 3. Convert floats back to 12-bit unsigned integers for the DAC
-	                          for (int i = 0; i < 1024; i++) {
-	                              // Add the 2048 DC offset back so the wave is centered properly
-	                              float dac_val = output_samples[i];
+	          // --- PROCESS SECOND HALF (Pong) ---
+	          else  if (dma_full_ready) {
+	              dma_full_ready = 0;
 
-	                              // Clamp values to prevent integer overflow/underflow screeching
-	                              if (dac_val > 4095.0f) dac_val = 4095.0f;
-	                              if (dac_val < 0.0f)    dac_val = 0.0f;
+	              uint16_t* raw_samples = (uint16_t*)dma_packed_buffer;
 
-	                              dac_buffer[i] = (uint16_t)dac_val;
-	                          }
+	              // 1. Unpack the second 512 samples
+	              // Notice the loop starts at 512 and goes to 1024
+	              for (int i = 512; i < 1024; i++) {
+	                  uint16_t s1 = raw_samples[(i * 3) + 0];
+	                  uint16_t s2 = raw_samples[(i * 3) + 1];
+	                  uint16_t s3 = raw_samples[(i * 3) + 2];
+	                  signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+	              }
+
+	              // 2. Filter the second half
+	              // Pass the address offset by 512, and process 512 samples
+	              FIR_ProcessBlock(&signal_samples[512], &output_samples[512], 512);
+
+	              // 3. Format the second half for the DAC
+	              for (int i = 512; i < 1024; i++) {
+	                  float dac_val = output_samples[i];
+	                  if (dac_val > 4095.0f) dac_val = 4095.0f;
+	                  if (dac_val < 0.0f)    dac_val = 0.0f;
+	                  dac_buffer[i] = (uint16_t)dac_val;
+	              }
 
 	          				// Just copy the raw input straight to the DAC buffer
 //	                          for (int i = 0; i < 1024; i++) {

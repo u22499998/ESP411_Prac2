@@ -15,7 +15,7 @@
 #define FIR_FP       1500.0f   // Passband edge
 #define FIR_F_STOP   3000.0f   // Stopband edge
 //#define FIR_FC       ((FIR_FP + FIR_F_STOP) / 2.0f) // Cutoff frequency
-#define FIR_FC       (1600) // Cutoff frequency
+#define FIR_FC       (FIR_FP+FIR_F_STOP)/2 // Cutoff frequency
 
 
 // Calculated Order: 3.3 * (48000 / 1250) = 105.6 -> round to odd 107
