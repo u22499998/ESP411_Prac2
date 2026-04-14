@@ -1094,7 +1094,7 @@ void StartDefaultTask(void const * argument)
 	                  uint16_t s1 = raw_samples[(i * 3) + 0];
 	                  uint16_t s2 = raw_samples[(i * 3) + 1];
 	                  uint16_t s3 = raw_samples[(i * 3) + 2];
-	                  signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+	                  signal_samples[i] = ((float)(s1 + s2 + s3) / 3.0f)- 124.0f;
 	              }
 
 	              // 2. Filter the first half
@@ -1122,7 +1122,7 @@ void StartDefaultTask(void const * argument)
 	                  uint16_t s1 = raw_samples[(i * 3) + 0];
 	                  uint16_t s2 = raw_samples[(i * 3) + 1];
 	                  uint16_t s3 = raw_samples[(i * 3) + 2];
-	                  signal_samples[i] = (float)(s1 + s2 + s3) / 3.0f;
+	                  signal_samples[i] = ((float)(s1 + s2 + s3) / 3.0f)- 124.0f;
 	              }
 
 	              // 2. Filter the second half
@@ -1164,13 +1164,25 @@ void StartDefaultTask(void const * argument)
 
 	                          									Diagnostics_UpdateRawFFT(fft_magnitudes);
 
-	                          								}else if (currentState ==  STATE_PLOT_RAW_TIME){
-	                          									  if (!graph_initialized) {
-	                          										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
-	                          										  graph_initialized = true;
-	                          									  }
-	                          									  // Plot the time domain of OUTPUT_SAMPLES
-	                          									  Diagnostics_UpdateTimeGraph(signal_samples, 1024);
+	                          								}else if (currentState == STATE_PLOT_RAW_TIME) {
+	                          								    if (!graph_initialized) {
+	                          								        Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+	                          								        graph_initialized = true;
+	                          								    }
+
+	                          								    // --- SOFTWARE TRIGGER ---
+	                          								    uint32_t trigger_index = 0;
+
+	                          								    float trigger_level = 2048.0f;
+
+	                          								    for (uint32_t i = 1; i < (1024 - 256); i++) {
+	                          								        if (signal_samples[i - 1] < trigger_level && signal_samples[i] >= trigger_level) {
+	                          								            trigger_index = i; // Found the start of a wave cycle
+	                          								            break;
+	                          								        }
+	                          								    }
+
+	                          								    Diagnostics_UpdateTimeGraph(&signal_samples[trigger_index], (1024 - trigger_index));
 	                          								}
 	                          								// --- ADDED: TIME DOMAIN BUTTON FOR h[m] (Stem Plot) ---
 	                          								else if (currentState == STATE_PLOT_HM_TIME) {
@@ -1190,13 +1202,23 @@ void StartDefaultTask(void const * argument)
 	                          									  Diagnostics_UpdateFilteredFFTPersist(fft_magnitudes);
 	                          								}
 	                          								else if (currentState == STATE_PLOT_BUFFER_TIME) {
-	                          									  if (!graph_initialized) {
-	                          										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
-	                          										  graph_initialized = true;
-	                          									  }
-	                          									  // Plot the time domain of OUTPUT_SAMPLES
-	                          									  Diagnostics_UpdateTimeGraph(output_samples, 1024);
-	                          								  }
+	                          								    if (!graph_initialized) {
+	                          								        Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+	                          								        graph_initialized = true;
+	                          								    }
+
+	                          								    uint32_t trigger_index = 0;
+	                          								    float trigger_level = 2048.0f; // Adjust to the DC average of your filtered signal
+
+	                          								    for (uint32_t i = 1; i < (1024 - 256); i++) {
+	                          								        if (output_samples[i - 1] < trigger_level && output_samples[i] >= trigger_level) {
+	                          								            trigger_index = i;
+	                          								            break;
+	                          								        }
+	                          								    }
+
+	                          								    Diagnostics_UpdateTimeGraph(&output_samples[trigger_index], (1024 - trigger_index));
+	                          								}
 	                          								else if (currentState == STATE_PLOT_BUFFER_FREQ) {
 	                          									  if (!graph_initialized) {
 	                          										  Diagnostics_InitFilteredFFTGraph(25, 25, 256, 175, 8, 5);
