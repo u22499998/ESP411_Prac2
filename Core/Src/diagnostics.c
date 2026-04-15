@@ -1,8 +1,8 @@
 /*
  * diagnostics.c
  *
- *  Created on: 02 Apr 2026
- *      Author: edwar
+ * Created on: 02 Apr 2026
+ * Author: edwar
  */
 
 #include "diagnostics.h"
@@ -10,6 +10,17 @@
 #include "stm32f429i_discovery_lcd.h"
 #include "fonts.h"    // Required for the sFONT structure and font tables
 #include <math.h>
+#include <string.h>   // Added for memset to clear memory arrays
+
+// ============================================================================
+// 0. GLOBAL GRAPHICS MEMORY (Moved here so they can be reset on screen init)
+// ============================================================================
+static uint16_t previous_heights[256] = {0};          // Raw FFT memory
+static uint16_t previous_y[256] = {0};                // Time Graph memory
+static uint16_t previous_filtered_heights[256] = {0}; // Filtered FFT memory
+static uint16_t prev_current[256] = {0};              // Persist FFT memory
+static float peak_heights[256] = {0};                 // Persist FFT memory
+static uint16_t prev_peaks[256] = {0};                // Persist FFT memory
 
 // ============================================================================
 // 1. LOW LEVEL LANDSCAPE ENGINE
@@ -73,6 +84,9 @@ void Diagnostics_InitRawFFTGraph(uint16_t origin_x, uint16_t origin_y,
         uint16_t x_length, uint16_t y_length,
         uint8_t num_x_indices, uint8_t num_y_indices)
 {
+        // Reset memory so the bars draw from the bottom again
+        memset(previous_heights, 0, sizeof(previous_heights));
+
 		BSP_LCD_Clear(COLOR_BG);
 	    BSP_LCD_SetTextColor(COLOR_TEXT);
 	    BSP_LCD_SetBackColor(COLOR_BG);
@@ -142,8 +156,6 @@ void Diagnostics_InitRawFFTGraph(uint16_t origin_x, uint16_t origin_y,
 }
 
 void Diagnostics_UpdateRawFFT(float* fft_magnitudes) {
-    static uint16_t previous_heights[256] = {0};
-
     for (int i = 1; i < 256; i++) {
         uint16_t x = 25 + i; // Exactly 1 bin per pixel
 
@@ -206,6 +218,9 @@ void Diagnostics_InitTimeGraph(uint16_t origin_x, uint16_t origin_y,
         uint16_t x_length, uint16_t y_length,
         uint8_t num_x_indices, uint8_t num_y_indices)
 {
+        // Reset memory
+        memset(previous_y, 0, sizeof(previous_y));
+
 	// 1. Clear the screen
 	    BSP_LCD_Clear(COLOR_BG);
 	    BSP_LCD_SetTextColor(COLOR_TEXT);
@@ -275,8 +290,6 @@ void Diagnostics_InitTimeGraph(uint16_t origin_x, uint16_t origin_y,
 }
 
 void Diagnostics_UpdateTimeGraph(float* time_buffer, uint16_t buffer_size) {
-    static uint16_t previous_y[256] = {0};
-
     // We only loop up to 256 to fit the screen width, acting as our "window"
     for (int i = 0; i < 256; i++) {
         // Safety check in case buffer is unexpectedly small
@@ -328,6 +341,12 @@ void Diagnostics_InitFilteredFFTGraph(uint16_t origin_x, uint16_t origin_y,
         uint16_t x_length, uint16_t y_length,
         uint8_t num_x_indices, uint8_t num_y_indices)
 {
+        // Reset memory for Filtered and Persist FFT functions
+        memset(previous_filtered_heights, 0, sizeof(previous_filtered_heights));
+        memset(prev_current, 0, sizeof(prev_current));
+        memset(peak_heights, 0, sizeof(peak_heights));
+        memset(prev_peaks, 0, sizeof(prev_peaks));
+
 	BSP_LCD_Clear(COLOR_BG);
     BSP_LCD_SetTextColor(COLOR_TEXT);
     BSP_LCD_SetBackColor(COLOR_BG);
@@ -399,7 +418,6 @@ void Diagnostics_InitFilteredFFTGraph(uint16_t origin_x, uint16_t origin_y,
 void Diagnostics_UpdateFilteredFFT(float* fft_magnitudes) {
     // We can use the EXACT same fast-hardware line drawing logic as the raw FFT.
     // However, we need a separate static array so it doesn't conflict with the Raw FFT's memory!
-    static uint16_t previous_filtered_heights[256] = {0};
 
     for (int i = 1; i < 256; i++) {
         uint16_t x = 25 + i;
@@ -455,11 +473,6 @@ void Diagnostics_UpdateFilteredFFT(float* fft_magnitudes) {
  * @brief Output Buffer FFT with Two-Tone Live Signal and Infinite Peak Hold
  */
 void Diagnostics_UpdateFilteredFFTPersist(float* fft_magnitudes) {
-    // Track both the live signal and the infinite peak
-    static uint16_t prev_current[256] = {0};
-    static float peak_heights[256] = {0};
-    static uint16_t prev_peaks[256] = {0};
-
     for (int i = 1; i < 256; i++) {
         uint16_t x = 25 + i;
 
@@ -565,5 +578,3 @@ void Diagnostics_DrawHMPlot(const float* coefficients, uint16_t order) {
             BSP_LCD_DrawLine(y1, x1, y2, x2);
         }
 }
-
-
