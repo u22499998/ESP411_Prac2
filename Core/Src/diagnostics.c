@@ -203,7 +203,7 @@ void Diagnostics_UpdateRawFFT(float* fft_magnitudes) {
 
 void Diagnostics_InitTimeGraph(uint16_t origin_x, uint16_t origin_y,
         uint16_t x_length, uint16_t y_length,
-        uint8_t num_x_indices, uint8_t num_y_indices)
+        uint8_t num_x_indices, uint8_t num_y_indices, int type)
 {
     memset(previous_y, 0, sizeof(previous_y));
 
@@ -252,7 +252,7 @@ void Diagnostics_InitTimeGraph(uint16_t origin_x, uint16_t origin_y,
     UI_DrawRotatedString(120, 15, "Time (Samples)");
 
     BSP_LCD_SetFont(&Font16);
-    UI_DrawRotatedString(60, 230, "FILTERED TIME DOMAIN");
+    (type == 0)? UI_DrawRotatedString(60, 230, "FILTERED TIME DOMAIN") : UI_DrawRotatedString(60, 230, "SAMPLED TIME DOMAIN");
 }
 
 void Diagnostics_UpdateTimeGraph(float* time_buffer, uint16_t buffer_size) {
@@ -362,7 +362,7 @@ void Diagnostics_InitFilteredFFTGraph(uint16_t origin_x, uint16_t origin_y,
 
     // --- ADDED: -3dB Threshold Red Line ---
     BSP_LCD_SetTextColor(LCD_COLOR_RED);
-    BSP_LCD_DrawVLine(191, origin_y, x_length);
+    BSP_LCD_DrawVLine(185, origin_y, x_length);
 
     // Main Title
     BSP_LCD_SetFont(&Font16);
@@ -412,8 +412,8 @@ void Diagnostics_UpdateFilteredFFT(float* fft_magnitudes) {
             }
 
             // Redraw the -3dB Red Line if erased
-            if (191 >= (26 + new_height) && 191 <= (25 + old_height)) {
-                DrawPixelLandscape(x, 191, LCD_COLOR_RED);
+            if (185 >= (26 + new_height) && 185 <= (25 + old_height)) {
+                DrawPixelLandscape(x, 185, LCD_COLOR_RED);
             }
         }
         previous_filtered_heights[i] = new_height;
@@ -467,8 +467,8 @@ void Diagnostics_UpdateFilteredFFTPersist(float* fft_magnitudes) {
             }
 
             // Redraw the -3dB Red Line if erased
-            if (191 >= (26 + peak_h) && 191 <= (26 + old_peak_h)) {
-                DrawPixelLandscape(x, 191, LCD_COLOR_RED);
+            if (185 >= (26 + peak_h) && 185 <= (26 + old_peak_h)) {
+                DrawPixelLandscape(x, 185, LCD_COLOR_RED);
             }
         }
 

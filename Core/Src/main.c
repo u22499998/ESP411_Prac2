@@ -1164,7 +1164,7 @@ void StartDefaultTask(void const * argument)
 								  }
 								  else if (currentState ==  STATE_PLOT_RAW_TIME){
 									  if (!graph_initialized) {
-										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4,1);
 										  graph_initialized = true;
 									  } else {
 										  Diagnostics_UpdateTimeGraph(signal_samples, 1024);
@@ -1188,7 +1188,7 @@ void StartDefaultTask(void const * argument)
 								  }
 								  else if (currentState == STATE_PLOT_BUFFER_TIME) {
 									  if (!graph_initialized) {
-										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4);
+										  Diagnostics_InitTimeGraph(25, 25, 256, 176, 8, 4,0);
 										  graph_initialized = true;
 									  } else {
 										  Diagnostics_UpdateTimeGraph(output_samples, 1024);
